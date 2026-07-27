@@ -1,0 +1,19 @@
+[build]
+  publish = "."
+  command = "# No build command needed for runtime JSX"
+
+[functions]
+  directory = "netlify/functions"
+
+# The scan and scan-status functions each declare their own `config.path`
+# (/api/scan and /api/scan-status), so Netlify serves them directly at those
+# paths. /api/scan runs synchronously and returns the finished report in one
+# request; /api/scan-status returns the last cached report. A manual `/api/*`
+# rewrite is unnecessary (and would 404, since functions with `config.path` are
+# not exposed under /.netlify/functions/<name>). The only redirect we need is
+# the SPA fallback below, which Netlify evaluates *after* function routes, so it
+# never shadows /api/scan or /api/scan-status.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
