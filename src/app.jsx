@@ -659,9 +659,35 @@ const App = () => {
                                 ) : orderedIncidents.length > 0 ? (
                                     <IncidentTimeline incidents={orderedIncidents} />
                                 ) : (
+                                    /*
+                                      Eine leere Liste hat zwei völlig
+                                      verschiedene Ursachen, und sie zu
+                                      vermengen war der teuerste Fehler dieser
+                                      Oberfläche: Entweder hat das Modell
+                                      ausgewertet und nichts Belegtes gefunden —
+                                      oder es hat gar nicht geantwortet. Der
+                                      Server weiß das (degraded), also wird es
+                                      hier auch gesagt.
+                                    */
+                                    intelData && intelData.degraded ? (
+                                        <div className="text-xs text-center py-10 bg-amber-50 rounded-lg border border-dashed border-amber-300 text-amber-800 px-6">
+                                            <div className="font-black uppercase tracking-wide mb-1">Auswertung nicht zustande gekommen</div>
+                                            <p className="leading-relaxed">
+                                                Die Vorfallsliste ist leer, weil die KI-Auswertung in diesem Durchlauf nicht gelaufen ist —
+                                                nicht, weil es nichts zu berichten gäbe. Der Score ist deshalb nur die Baseline.
+                                            </p>
+                                            {intelData.degradedReason && (
+                                                <p className="mt-2 font-mono text-[10px] text-amber-700 break-words">{intelData.degradedReason}</p>
+                                            )}
+                                            <p className="mt-2 text-amber-700">
+                                                {(intelData.sources || []).length} Artikel wurden abgerufen und stehen unten als Quellen — nur eingeordnet wurden sie nicht.
+                                            </p>
+                                        </div>
+                                    ) : (
                                     <div className="text-xs text-slate-400 text-center py-10 bg-slate-50 rounded-lg border border-dashed border-slate-200">
                                         {intelData ? "Keine akuten, durch Quellen belegten Vorfälle in den letzten 30 Tagen. Der Score basiert auf der Baseline-Bedrohungslage." : "Warte auf Scan..."}
                                     </div>
+                                    )
                                 )}
                             </div>
 

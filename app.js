@@ -871,9 +871,30 @@ const App = () => {
     className: "h-24 bg-slate-100 rounded-lg animate-pulse"
   }))) : orderedIncidents.length > 0 ? /*#__PURE__*/React.createElement(IncidentTimeline, {
     incidents: orderedIncidents
-  }) : /*#__PURE__*/React.createElement("div", {
+  }) : (
+  /*
+    Eine leere Liste hat zwei völlig
+    verschiedene Ursachen, und sie zu
+    vermengen war der teuerste Fehler dieser
+    Oberfläche: Entweder hat das Modell
+    ausgewertet und nichts Belegtes gefunden —
+    oder es hat gar nicht geantwortet. Der
+    Server weiß das (degraded), also wird es
+    hier auch gesagt.
+  */
+  intelData && intelData.degraded ? /*#__PURE__*/React.createElement("div", {
+    className: "text-xs text-center py-10 bg-amber-50 rounded-lg border border-dashed border-amber-300 text-amber-800 px-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "font-black uppercase tracking-wide mb-1"
+  }, "Auswertung nicht zustande gekommen"), /*#__PURE__*/React.createElement("p", {
+    className: "leading-relaxed"
+  }, "Die Vorfallsliste ist leer, weil die KI-Auswertung in diesem Durchlauf nicht gelaufen ist \u2014 nicht, weil es nichts zu berichten g\xE4be. Der Score ist deshalb nur die Baseline."), intelData.degradedReason && /*#__PURE__*/React.createElement("p", {
+    className: "mt-2 font-mono text-[10px] text-amber-700 break-words"
+  }, intelData.degradedReason), /*#__PURE__*/React.createElement("p", {
+    className: "mt-2 text-amber-700"
+  }, (intelData.sources || []).length, " Artikel wurden abgerufen und stehen unten als Quellen \u2014 nur eingeordnet wurden sie nicht.")) : /*#__PURE__*/React.createElement("div", {
     className: "text-xs text-slate-400 text-center py-10 bg-slate-50 rounded-lg border border-dashed border-slate-200"
-  }, intelData ? "Keine akuten, durch Quellen belegten Vorfälle in den letzten 30 Tagen. Der Score basiert auf der Baseline-Bedrohungslage." : "Warte auf Scan...")), sources.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, intelData ? "Keine akuten, durch Quellen belegten Vorfälle in den letzten 30 Tagen. Der Score basiert auf der Baseline-Bedrohungslage." : "Warte auf Scan..."))), sources.length > 0 && /*#__PURE__*/React.createElement("div", {
     className: "bg-white rounded-xl border border-slate-200 p-6 shadow-sm"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2 mb-4 pb-2 border-b border-slate-100"

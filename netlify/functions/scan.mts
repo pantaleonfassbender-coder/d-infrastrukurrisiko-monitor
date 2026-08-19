@@ -24,12 +24,17 @@ const MODEL = env("SCAN_MODEL") || "gemini-3-flash-preview";
 const FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash"];
 const MODEL_CHAIN = [MODEL, ...FALLBACK_MODELS.filter((m) => m !== MODEL)];
 
-// Obergrenze der Modellausgabe. Sie ist der wichtigste Hebel für die Laufzeit:
-// Eingabe-Token werden schnell verarbeitet, erzeugte Token kosten Zeit. Bei
-// 8000 Token schrieb das Modell, sobald die Artikelliste ergiebig wurde,
-// minutenlang an einer langen Vorfallsliste — und riss damit das Zeitlimit der
-// Function. Zusammen mit MAX_INCIDENTS ist die Ausgabe jetzt gedeckelt.
-const SYNTHESIS_MAX_TOKENS = 3000;
+// Obergrenze der Modellausgabe. Sie darf NICHT als Zeitbremse missbraucht
+// werden: Diese Aufgabe erfüllt der Abbruch-Timer am Modellaufruf, der hart an
+// das Zeitbudget gekoppelt ist. Ein Versuch, die Laufzeit über dieses Limit zu
+// drosseln (3000 Token), ging nach hinten los — die eingesetzten Gemini-Modelle
+// denken vor der Antwort, und diese Denkschritte zählen gegen dasselbe
+// Kontingent. Reicht es nicht für Denken UND JSON, endet die Antwort mit
+// finishReason MAX_TOKENS, der Text ist leer oder abgeschnitten, das Parsen
+// scheitert — und die Seite zeigt einen Baseline-Bericht ohne einen einzigen
+// Vorfall, so als hätte es nichts zu berichten gegeben.
+// Der Umfang wird deshalb über MAX_INCIDENTS gesteuert, nicht über dieses Limit.
+const SYNTHESIS_MAX_TOKENS = Number(env("SCAN_MAX_TOKENS")) || 8000;
 // Wie viele Vorfälle das Modell höchstens ausgeben soll. Ein Lagebild lebt von
 // den wichtigsten Vorfällen, nicht von Vollständigkeit um jeden Preis.
 const MAX_INCIDENTS = 8;
@@ -185,7 +190,7 @@ STRIKTE REGELN:
 4. Nicht jeder Artikel ist ein sicherheitsrelevanter Vorfall. Verwirf themenfremde Treffer (Sport, Politik ohne Infrastrukturbezug, Wirtschaft allgemein). Findest du keine belegten Vorfälle, gib eine leere Liste zurück.
 5. REFERENZIERUNG IM LAGEBERICHT: Nenne Quellen im "summary" IMMER einheitlich mit ihrem Medien-/Quellennamen im Fließtext (z.B. „laut Tagesschau", „wie der NDR berichtet", „einer Meldung von Reuters zufolge"). Verwende NIEMALS die laufende Nummer aus der Artikelliste und schreibe NIEMALS „(Quelle 3)", „Quelle 5" o.Ä. Die Nummerierung der übergebenen Liste dient nur deiner internen Zuordnung und ist dem Leser nicht sichtbar.
 
-6. UMFANG: Gib HÖCHSTENS ${MAX_INCIDENTS} Vorfälle aus, die schwerwiegendsten zuerst. Halte "description" auf ein bis zwei Sätze und den Lagebericht auf höchstens fünf Sätze. Eine längere Antwort läuft in das Zeitlimit dieses Durchlaufs und geht dadurch vollständig verloren — Kürze ist hier keine Stilfrage, sondern Voraussetzung dafür, dass das Ergebnis überhaupt ankommt.
+6. UMFANG: Gib HÖCHSTENS ${MAX_INCIDENTS} Vorfälle aus, die schwerwiegendsten zuerst. Halte "description" auf ein bis zwei Sätze und den Lagebericht auf höchstens fünf Sätze. Diese Grenze betrifft nur die Länge der Darstellung — sie ist KEIN Grund, einen belegten Vorfall wegzulassen oder im Zweifel eine leere Liste auszugeben.
 
 BERECHNUNG DES RISIKO-SCORES (0-100):
 - 35-45 (BASELINE): Keine neuen Vorfälle, aber anhaltende hybride Bedrohungslage (Status Quo).
@@ -661,10 +666,15 @@ export default async (req: Request, context: Context) => {
     // Welches Modell die Auswertung tatsächlich geliefert hat — nicht
     // zwangsläufig das erste der Kette. Die Oberfläche zeigt den Wert an.
     let usedModel = MODEL;
+    // Warum die Auswertung nicht zustande kam. Ohne diesen Grund zeigt die
+    // Oberfläche einen leeren Lagebericht und behauptet damit, es habe nichts
+    // zu berichten gegeben — obwohl das Modell gar nicht geantwortet hat.
+    let degradedReason = "";
 
     if (feedsOk === 0) {
       // Kein einziger Feed erreichbar → transparenter Baseline-Bericht statt Fehler.
       degraded = true;
+      degradedReason = "Es konnten keine Nachrichten-Feeds abgerufen werden.";
       analysis = buildBaseline(0, "Es konnten keine Nachrichten-Feeds abgerufen werden.", region);
     } else {
       const ai = new GoogleGenAI({});
@@ -710,7 +720,27 @@ export default async (req: Request, context: Context) => {
               httpOptions: { timeout: modelTimeoutMs },
             },
           });
-          analysis = parseAnalysis(response.text ?? "");
+          // Vor dem Parsen prüfen, WARUM die Antwort so aussieht, wie sie
+          // aussieht. Ein abgeschnittener oder leerer Text erzeugt sonst nur
+          // einen nichtssagenden JSON-Fehler, und der landet als „keine
+          // Vorfälle" beim Leser — die teuerste Art, einen Fehler zu verstecken.
+          const raw = response.text ?? "";
+          const finishReason = (response as any)?.candidates?.[0]?.finishReason ?? "";
+          if (!raw.trim()) {
+            throw new Error(
+              `Das Modell lieferte keinen Text (finishReason: ${finishReason || "unbekannt"}).` +
+                (finishReason === "MAX_TOKENS"
+                  ? ` Das Token-Kontingent (${SYNTHESIS_MAX_TOKENS}) ging bereits für die Denkschritte drauf. Über SCAN_MAX_TOKENS erhöhen.`
+                  : ""),
+            );
+          }
+          if (finishReason === "MAX_TOKENS") {
+            throw new Error(
+              `Die Antwort wurde am Token-Limit (${SYNTHESIS_MAX_TOKENS}) abgeschnitten und ist unvollständig. ` +
+                "Über SCAN_MAX_TOKENS erhöhen oder MAX_INCIDENTS senken.",
+            );
+          }
+          analysis = parseAnalysis(raw);
           usedModel = candidate;
           if (candidate !== MODEL) {
             console.warn(`scan: Modell "${MODEL}" nicht nutzbar, "${candidate}" hat übernommen.`);
@@ -729,6 +759,9 @@ export default async (req: Request, context: Context) => {
 
       if (!analysis) {
         degraded = true;
+        degradedReason = lastTimedOut
+          ? `Zeitlimit überschritten (${Math.round(lastTimeoutMs / 1000)} s).`
+          : lastError || "Kein Modell der Kette war erreichbar.";
         const reason = lastTimedOut
           ? `Die KI-Auswertung überschritt das Zeitlimit dieses Durchlaufs (${Math.round(lastTimeoutMs / 1000)} s).`
           : `Kein Modell der Kette war erreichbar (${MODEL_CHAIN.join(", ")}). Letzte Meldung: ${lastError || "unbekannt"}. ` +
@@ -833,6 +866,7 @@ export default async (req: Request, context: Context) => {
       incidents: finalIncidents,
       sources,
       degraded,
+      degradedReason,
       dateAdjustments,
       staleRemoved,
       model: usedModel,
