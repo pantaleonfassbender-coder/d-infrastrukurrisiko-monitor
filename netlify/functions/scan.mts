@@ -2,6 +2,8 @@ import type { Config, Context } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import { GoogleGenAI } from "@google/genai";
 
+import { LIMITS, reserveScan } from "../lib/quota.mts";
+
 // Gemini 3 Flash über das Netlify AI Gateway. Das Gateway injiziert
 // GEMINI_API_KEY / GOOGLE_GEMINI_BASE_URL zur Laufzeit, daher kommt der
 // zero-config Konstruktor ohne Secrets im Quelltext aus.
@@ -575,7 +577,7 @@ function buildBaseline(articleCount: number, reason: string, region: RegionConfi
 // -----------------------------------------------------------------------------
 // Funktion: synchron. Ein Request, eine Antwort (~5-15s), kein Polling mehr.
 // -----------------------------------------------------------------------------
-export default async (req: Request, _context: Context) => {
+export default async (req: Request, context: Context) => {
   const startedAt = Date.now();
   const store = getStore({ name: SCAN_STORE, consistency: "strong" });
 
@@ -587,6 +589,22 @@ export default async (req: Request, _context: Context) => {
     region = resolveRegion(body?.region);
   } catch {
     /* Kein/ungültiger Body → Standardregion Deutschland. */
+  }
+
+  // Kontingent buchen, bevor irgendein Feed oder das Modell angefasst wird.
+  // Der zuletzt gecachte Lagebericht bleibt über /api/scan-status erreichbar,
+  // eine Absage nimmt der Seite also nichts als den neuen Lauf.
+  const reservation = await reserveScan(
+    context.ip,
+    context.site?.id ?? "local",
+    Date.now(),
+  );
+
+  if (!reservation.allowed) {
+    return Response.json(
+      { error: reservation.message, scope: reservation.scope },
+      { status: 429, headers: { "Retry-After": String(reservation.retryAfter) } },
+    );
   }
 
   try {
@@ -739,10 +757,15 @@ export default async (req: Request, _context: Context) => {
       generatedAt: new Date().toISOString(),
     };
 
-    // 4) Als jüngsten Stand der Region cachen und direkt zurückgeben.
+    // 4) Als jüngsten Stand der Region cachen und direkt zurückgeben. Das
+    //    Kontingent gehört nicht in den Cache: es gilt je Besucher, der Cache
+    //    dagegen für alle.
     await store.setJSON(region.cacheKey, { status: "done", result });
 
-    return Response.json(result);
+    return Response.json({
+      ...result,
+      quota: { remaining: reservation.visitorRemaining, dailyLimit: LIMITS.visitorPerDay },
+    });
   } catch (error: any) {
     const message = error?.message || "Unbekannter Fehler bei der Analyse.";
     console.error("scan:", message);
@@ -761,4 +784,14 @@ export default async (req: Request, _context: Context) => {
 export const config: Config = {
   path: "/api/scan",
   method: "POST",
+  // Erste Verteidigungslinie, angewandt am Edge, bevor die Function startet.
+  // Ein Lauf dauert etliche Sekunden und kostet einen Modellaufruf; mehr als
+  // ein paar Starts pro Minute braucht niemand ernsthaft. Diese Schicht fängt
+  // maschinelle Fluten ab, ohne dass dafür auch nur ein Feed abgerufen oder
+  // ein Token bezahlt wird. Die Tagesgrenzen stehen in netlify/lib/quota.mts.
+  rateLimit: {
+    windowSize: 60,
+    windowLimit: 5,
+    aggregateBy: ["ip", "domain"],
+  },
 };
