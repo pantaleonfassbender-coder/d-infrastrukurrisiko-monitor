@@ -7,7 +7,22 @@ import { LIMITS, reserveScan } from "../lib/quota.mts";
 // Gemini 3 Flash über das Netlify AI Gateway. Das Gateway injiziert
 // GEMINI_API_KEY / GOOGLE_GEMINI_BASE_URL zur Laufzeit, daher kommt der
 // zero-config Konstruktor ohne Secrets im Quelltext aus.
-const MODEL = "gemini-3-flash-preview";
+function env(key: string): string | undefined {
+  const global = globalThis as any;
+  return global.Netlify?.env?.get(key) ?? global.process?.env?.[key];
+}
+
+// Modellwahl mit Ausweichkette. Eine Vorschau-Kennung wie
+// "gemini-3-flash-preview" ist naturgemäß vergänglich: Wird sie zurückgezogen,
+// scheitert der Aufruf, und die Function liefert bisher stillschweigend einen
+// Baseline-Bericht mit der wenig hilfreichen Begründung, das Gateway sei nicht
+// erreichbar. Über SCAN_MODEL lässt sich ohne Codeänderung ein anderes Modell
+// setzen; schlägt das erste fehl, werden die folgenden der Reihe nach versucht,
+// solange das Zeitbudget es hergibt. Erst wenn alle scheitern, greift der
+// Baseline-Bericht — dann aber mit dem echten Fehler in der Begründung.
+const MODEL = env("SCAN_MODEL") || "gemini-3-flash-preview";
+const FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash"];
+const MODEL_CHAIN = [MODEL, ...FALLBACK_MODELS.filter((m) => m !== MODEL)];
 const SYNTHESIS_MAX_TOKENS = 8000;
 
 // Gesamt-Zeitbudget der synchronen Function. Es liegt bewusst unter dem
@@ -620,6 +635,9 @@ export default async (req: Request, context: Context) => {
     //    voll über das AI Gateway unterstützt (keine serverseitigen Tools).
     let analysis: any;
     let degraded = false;
+    // Welches Modell die Auswertung tatsächlich geliefert hat — nicht
+    // zwangsläufig das erste der Kette. Die Oberfläche zeigt den Wert an.
+    let usedModel = MODEL;
 
     if (feedsOk === 0) {
       // Kein einziger Feed erreichbar → transparenter Baseline-Bericht statt Fehler.
@@ -638,32 +656,60 @@ export default async (req: Request, context: Context) => {
       // zurückgefallen – die echten, bereits abgerufenen Quellen bleiben sichtbar.
       const modelDeadline =
         startedAt + SCAN_BUDGET_MS - RESPONSE_RESERVE_MS - DATE_RESOLUTION_RESERVE_MS;
-      const modelTimeoutMs = Math.max(8_000, modelDeadline - Date.now());
-      try {
-        const response = await ai.models.generateContent({
-          model: MODEL,
-          contents: buildUserPrompt(articles, region),
-          config: {
-            systemInstruction: buildSystemPrompt(region),
-            maxOutputTokens: SYNTHESIS_MAX_TOKENS,
-            temperature: 0.2,
-            responseMimeType: "application/json",
-            abortSignal: AbortSignal.timeout(modelTimeoutMs),
-            httpOptions: { timeout: modelTimeoutMs },
-          },
-        });
-        analysis = parseAnalysis(response.text ?? "");
-      } catch (modelError: any) {
+
+      // Die Kette der Reihe nach durchgehen. Ein Zeitüberschreitung bricht ab,
+      // statt das nächste Modell zu versuchen: Wenn schon das erste ins
+      // Zeitlimit lief, ist für ein zweites ohnehin keine Zeit mehr, und ein
+      // weiterer Versuch würde die Function in das Plattform-Limit treiben.
+      // Nur ein echter Fehler (unbekannte Kennung, abgelehntes Modell) führt
+      // zum nächsten Eintrag.
+      let lastError = "";
+      let lastTimedOut = false;
+      let lastTimeoutMs = 0;
+
+      for (const candidate of MODEL_CHAIN) {
+        const modelTimeoutMs = modelDeadline - Date.now();
+        if (modelTimeoutMs < 8_000) {
+          lastError ||= "Für einen weiteren Modellversuch blieb keine Zeit.";
+          break;
+        }
+        lastTimeoutMs = modelTimeoutMs;
+        try {
+          const response = await ai.models.generateContent({
+            model: candidate,
+            contents: buildUserPrompt(articles, region),
+            config: {
+              systemInstruction: buildSystemPrompt(region),
+              maxOutputTokens: SYNTHESIS_MAX_TOKENS,
+              temperature: 0.2,
+              responseMimeType: "application/json",
+              abortSignal: AbortSignal.timeout(modelTimeoutMs),
+              httpOptions: { timeout: modelTimeoutMs },
+            },
+          });
+          analysis = parseAnalysis(response.text ?? "");
+          usedModel = candidate;
+          if (candidate !== MODEL) {
+            console.warn(`scan: Modell "${MODEL}" nicht nutzbar, "${candidate}" hat übernommen.`);
+          }
+          break;
+        } catch (modelError: any) {
+          lastError = String(modelError?.message ?? modelError ?? "");
+          lastTimedOut =
+            modelError?.name === "AbortError" ||
+            modelError?.name === "TimeoutError" ||
+            /abort|timed?\s*out|timeout|deadline/i.test(lastError);
+          console.error(`scan: Modell "${candidate}" fehlgeschlagen:`, lastError);
+          if (lastTimedOut) break;
+        }
+      }
+
+      if (!analysis) {
         degraded = true;
-        const msg = String(modelError?.message ?? modelError ?? "");
-        const timedOut =
-          modelError?.name === "AbortError" ||
-          modelError?.name === "TimeoutError" ||
-          /abort|timed?\s*out|timeout|deadline/i.test(msg);
-        const reason = timedOut
-          ? `Die KI-Auswertung überschritt das Zeitlimit dieses Durchlaufs (${Math.round(modelTimeoutMs / 1000)} s).`
-          : "Die KI-Auswertung war in diesem Durchlauf nicht erreichbar (das AI Gateway ist erst nach mindestens einem Produktions-Deployment aktiv).";
-        console.error("scan: Modellauswertung fehlgeschlagen:", msg);
+        const reason = lastTimedOut
+          ? `Die KI-Auswertung überschritt das Zeitlimit dieses Durchlaufs (${Math.round(lastTimeoutMs / 1000)} s).`
+          : `Kein Modell der Kette war erreichbar (${MODEL_CHAIN.join(", ")}). Letzte Meldung: ${lastError || "unbekannt"}. ` +
+            "Hinweis: Das AI Gateway ist erst nach mindestens einem Produktions-Deployment aktiv.";
         analysis = buildBaseline(articles.length, reason, region);
       }
     }
@@ -753,7 +799,7 @@ export default async (req: Request, context: Context) => {
       degraded,
       dateAdjustments,
       staleRemoved,
-      model: MODEL,
+      model: usedModel,
       generatedAt: new Date().toISOString(),
     };
 
