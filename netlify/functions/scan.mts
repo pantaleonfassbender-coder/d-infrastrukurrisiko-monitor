@@ -37,7 +37,7 @@ const MODEL_CHAIN = [MODEL, ...FALLBACK_MODELS.filter((m) => m !== MODEL)];
 const SYNTHESIS_MAX_TOKENS = Number(env("SCAN_MAX_TOKENS")) || 8000;
 // Wie viele Vorfälle das Modell höchstens ausgeben soll. Ein Lagebild lebt von
 // den wichtigsten Vorfällen, nicht von Vollständigkeit um jeden Preis.
-const MAX_INCIDENTS = 8;
+const MAX_INCIDENTS = 6;
 
 // Gesamt-Zeitbudget der synchronen Function. Es MUSS unter dem Zeitlimit der
 // Plattform liegen, damit die Function immer selbst eine JSON-Antwort liefert.
@@ -55,21 +55,21 @@ const MAX_INCIDENTS = 8;
 //
 // Über SCAN_BUDGET_MS lässt sich der Wert ohne Codeänderung anpassen — nach
 // oben aber nur, wenn das Zeitlimit der Function tatsächlich höher liegt.
-const SCAN_BUDGET_MS = Number(env("SCAN_BUDGET_MS")) || 22_000;
+const SCAN_BUDGET_MS = Number(env("SCAN_BUDGET_MS")) || 24_000;
 // Puffer, der am Ende des Budgets für Serialisierung, Cache-Schreiben und die
 // Antwort reserviert bleibt.
-const RESPONSE_RESERVE_MS = 3_000;
+const RESPONSE_RESERVE_MS = 2_500;
 // Zeit, die nach der Modellauswertung dem optionalen Datumsabgleich (Schritt 3b)
 // vorbehalten bleibt. Die Modellauswertung erhält entsprechend weniger Budget,
 // damit für die Quellenauflösung noch Zeit übrig ist.
-const DATE_RESOLUTION_RESERVE_MS = 5_000;
+const DATE_RESOLUTION_RESERVE_MS = 4_000;
 // Obergrenze einer einzelnen Quellenauflösung (zwei HTTP-Aufrufe à 3 s). Es wird
 // keine neue Auflösung mehr gestartet, wenn sie das Zeitbudget reißen könnte.
 const RESOLVE_MAX_MS = 5_000;
 // Wie viele Vorfälle höchstens gegen ihre Quelle datumsgeprüft werden. Gemessen
 // dauert eine Auflösung im Schnitt gut eine Sekunde; bei sechs parallel ist das
 // Feld damit in gut zwei Sekunden abgearbeitet.
-const MAX_DATE_RESOLUTIONS = 8;
+const MAX_DATE_RESOLUTIONS = 6;
 
 // Ergebnis-Cache: der letzte Lagebericht je Region liegt unter dem
 // regionsspezifischen Schlüssel und wird von /api/scan-status ausgeliefert,
@@ -81,7 +81,7 @@ const SCAN_STORE = "scans";
 const WINDOW_DAYS = 30;
 // Obergrenze der an das Modell übergebenen Artikel, damit der Prompt kompakt
 // bleibt und die Klassifikation schnell und günstig ist.
-const MAX_ARTICLES = 30;
+const MAX_ARTICLES = 18;
 
 // -----------------------------------------------------------------------------
 // Regionen
@@ -699,14 +699,22 @@ export default async (req: Request, context: Context) => {
       let lastError = "";
       let lastTimedOut = false;
       let lastTimeoutMs = 0;
+      // Welche Modelle mit wie viel Zeit versucht wurden. Ohne diese Angabe
+      // sagt eine Zeitüberschreitung nur, DASS es zu lang war, nicht wem und
+      // wie knapp — und genau das braucht man, um die Konstanten zu setzen.
+      const tried: string[] = [];
 
       for (const candidate of MODEL_CHAIN) {
         const modelTimeoutMs = modelDeadline - Date.now();
-        if (modelTimeoutMs < 8_000) {
+        // Untergrenze, unter der ein Versuch nicht mehr lohnt. Sie liegt
+        // bewusst niedrig: Ein Ausweichmodell ist oft gerade deshalb
+        // interessant, weil es schneller antwortet als das erste.
+        if (modelTimeoutMs < 5_000) {
           lastError ||= "Für einen weiteren Modellversuch blieb keine Zeit.";
           break;
         }
         lastTimeoutMs = modelTimeoutMs;
+        tried.push(`${candidate} (${Math.round(modelTimeoutMs / 1000)} s)`);
         try {
           const response = await ai.models.generateContent({
             model: candidate,
@@ -753,15 +761,20 @@ export default async (req: Request, context: Context) => {
             modelError?.name === "TimeoutError" ||
             /abort|timed?\s*out|timeout|deadline/i.test(lastError);
           console.error(`scan: Modell "${candidate}" fehlgeschlagen:`, lastError);
-          if (lastTimedOut) break;
+          // Früher brach die Kette bei einer Zeitüberschreitung sofort ab, mit
+          // der Begründung, für einen zweiten Versuch sei ohnehin keine Zeit.
+          // Das war falsch herum gedacht: Wenn das erste Modell zu langsam ist,
+          // ist ein schnelleres genau die Rettung — sofern noch Zeit bleibt.
+          // Ob sie bleibt, entscheidet die Prüfung am Schleifenanfang.
+          if (lastTimedOut && modelDeadline - Date.now() < 5_000) break;
         }
       }
 
       if (!analysis) {
         degraded = true;
         degradedReason = lastTimedOut
-          ? `Zeitlimit überschritten (${Math.round(lastTimeoutMs / 1000)} s).`
-          : lastError || "Kein Modell der Kette war erreichbar.";
+          ? `Zeitlimit überschritten. Versucht: ${tried.join(", ") || "nichts"}.`
+          : `${lastError || "Kein Modell der Kette war erreichbar."} Versucht: ${tried.join(", ") || "nichts"}.`;
         const reason = lastTimedOut
           ? `Die KI-Auswertung überschritt das Zeitlimit dieses Durchlaufs (${Math.round(lastTimeoutMs / 1000)} s).`
           : `Kein Modell der Kette war erreichbar (${MODEL_CHAIN.join(", ")}). Letzte Meldung: ${lastError || "unbekannt"}. ` +
