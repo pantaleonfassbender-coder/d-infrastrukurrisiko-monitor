@@ -130,6 +130,20 @@
     Stand, und ein neuer Scan überschreibt ihn.
   </p>
 
+  <h2>Kontingentzähler</h2>
+  <p>
+    Ein Scan kostet Rechenzeit und einen Modellaufruf. Damit ein automatisierter Aufrufer das Budget nicht in Minuten
+    verbraucht, ist die Zahl der Scans begrenzt — pro Tag je Besucher und pro Tag für die gesamte Seite. Dafür ist ein
+    Zähler nötig, der wiedererkennt, ob eine Anfrage vom selben Aufrufer stammt wie die vorherige.
+  </p>
+  <p>
+    Gespeichert wird dafür <strong>nicht Ihre IP-Adresse</strong>, sondern ein mit der Projektkennung gesalzener
+    SHA-256-Hash davon, gekürzt auf 32 Zeichen. Daraus lässt sich die Adresse nicht zurückrechnen, und außerhalb
+    dieser Seite ist der Wert wertlos. Zu diesem Hash gehört nur eine Zahl — wie viele Scans an diesem Kalendertag
+    ausgelöst wurden. Die Zähler sind nach UTC-Tag gebündelt und werden nach drei Tagen automatisch gelöscht.
+    Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO — Schutz vor missbräuchlicher Nutzung und vor unbegrenzten Kosten.
+  </p>
+
   <h2>Empfänger</h2>
   <p>
     Die Netlify, Inc. als Hoster, Betreiberin des AI Gateway und des Zwischenspeichers; die Google LLC als Anbieterin
@@ -143,7 +157,8 @@
     Sie haben das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung
     (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21), außerdem nach Art. 77 ein Beschwerderecht bei
     einer Aufsichtsbehörde. Anfragen an die oben genannte Adresse. Die Antwort fällt kurz aus, weil außer den
-    Server-Logs nichts über Sie vorliegt — die Seite kennt Sie nicht.
+    Server-Logs und dem oben beschriebenen Kontingentzähler nichts über Sie vorliegt — die Seite kennt Sie nicht,
+    und der Zähler ist bereits nach drei Tagen fort.
   </p>
   <p>
     Ein Vertreter in der Union nach Art. 27 DSGVO ist nicht benannt. Der Anbieter stützt sich auf die Ausnahme des
@@ -155,8 +170,9 @@
   <h2>Hinweis für Nutzerinnen und Nutzer aus Kalifornien</h2>
   <p>
     Nach dem California Online Privacy Protection Act (Cal. Bus. &amp; Prof. Code §§ 22575–22579): Erhoben werden
-    Angaben zur Netzwerkaktivität in Gestalt der oben beschriebenen Server-Logs. Name, Anschrift, E-Mail-Adresse oder
-    Telefonnummer werden nicht erhoben — die Seite besitzt kein Feld zu ihrer Eingabe. Benutzerkonten und gespeicherte
+    Angaben zur Netzwerkaktivität in Gestalt der oben beschriebenen Server-Logs und des Kontingentzählers. Name,
+    Anschrift, E-Mail-Adresse oder Telefonnummer werden nicht erhoben — die Seite besitzt kein Feld zu ihrer
+    Eingabe. Benutzerkonten und gespeicherte
     Profile gibt es nicht, es existiert also kein Datensatz zur Einsicht oder Änderung. <strong>Do Not Track:</strong>
     Diese Seite verfolgt ihre Besucher weder über die Zeit noch über fremde Websites hinweg und ändert ihr Verhalten
     bei einem Do-Not-Track-Signal deshalb nicht — es gibt kein Tracking, das abzuschalten wäre. Wesentliche Änderungen
