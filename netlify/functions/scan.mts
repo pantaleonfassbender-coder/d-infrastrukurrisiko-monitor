@@ -23,27 +23,48 @@ function env(key: string): string | undefined {
 const MODEL = env("SCAN_MODEL") || "gemini-3-flash-preview";
 const FALLBACK_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash"];
 const MODEL_CHAIN = [MODEL, ...FALLBACK_MODELS.filter((m) => m !== MODEL)];
-const SYNTHESIS_MAX_TOKENS = 8000;
 
-// Gesamt-Zeitbudget der synchronen Function. Es liegt bewusst unter dem
-// Plattform-Limit (60 s für synchrone Netlify Functions), damit die Function
-// IMMER selbst eine JSON-Antwort liefert. Wird das Budget überschritten, bricht
-// sonst die Plattform die Ausführung ab und schickt eine HTML-Fehlerseite
-// (Status 504) an den Client – die dort zu „keine gültige JSON-Antwort" bzw.
-// „Unexpected token '<'" führt, weil eine HTML-Antwort nicht als JSON geparst
-// werden kann. Jeder potenziell langlaufende Schritt (Modellauswertung,
-// optionale Datumsauflösung in Schritt 3b) wird an dieses Budget gekoppelt.
-const SCAN_BUDGET_MS = 50_000;
+// Obergrenze der Modellausgabe. Sie ist der wichtigste Hebel für die Laufzeit:
+// Eingabe-Token werden schnell verarbeitet, erzeugte Token kosten Zeit. Bei
+// 8000 Token schrieb das Modell, sobald die Artikelliste ergiebig wurde,
+// minutenlang an einer langen Vorfallsliste — und riss damit das Zeitlimit der
+// Function. Zusammen mit MAX_INCIDENTS ist die Ausgabe jetzt gedeckelt.
+const SYNTHESIS_MAX_TOKENS = 3000;
+// Wie viele Vorfälle das Modell höchstens ausgeben soll. Ein Lagebild lebt von
+// den wichtigsten Vorfällen, nicht von Vollständigkeit um jeden Preis.
+const MAX_INCIDENTS = 8;
+
+// Gesamt-Zeitbudget der synchronen Function. Es MUSS unter dem Zeitlimit der
+// Plattform liegen, damit die Function immer selbst eine JSON-Antwort liefert.
+// Wird das Limit überschritten, bricht die Plattform ab und schickt eine
+// HTML-Fehlerseite (Status 504) — im Client sichtbar als „keine gültige
+// JSON-Antwort" bzw. „Unexpected token '<'", weil sich HTML nicht als JSON
+// parsen lässt.
+//
+// ACHTUNG, hier stand lange ein falscher Wert: Der Kommentar ging von 60 s aus
+// und setzte das Budget auf 50 s. Synchrone Netlify-Functions brechen aber weit
+// früher ab — 10 s im Standard, höchstens 26 s. Die interne Bremse lag damit
+// jenseits des Limits und konnte nie greifen. Solange ein Lauf 5–15 s dauerte,
+// fiel das nicht auf; sobald die Artikelliste ergiebig wurde, führte jeder
+// längere Lauf direkt in den 504.
+//
+// Über SCAN_BUDGET_MS lässt sich der Wert ohne Codeänderung anpassen — nach
+// oben aber nur, wenn das Zeitlimit der Function tatsächlich höher liegt.
+const SCAN_BUDGET_MS = Number(env("SCAN_BUDGET_MS")) || 22_000;
 // Puffer, der am Ende des Budgets für Serialisierung, Cache-Schreiben und die
 // Antwort reserviert bleibt.
-const RESPONSE_RESERVE_MS = 4_000;
+const RESPONSE_RESERVE_MS = 3_000;
 // Zeit, die nach der Modellauswertung dem optionalen Datumsabgleich (Schritt 3b)
 // vorbehalten bleibt. Die Modellauswertung erhält entsprechend weniger Budget,
 // damit für die Quellenauflösung noch Zeit übrig ist.
-const DATE_RESOLUTION_RESERVE_MS = 9_000;
-// Obergrenze einer einzelnen Quellenauflösung (zwei HTTP-Aufrufe à 4 s). Es wird
+const DATE_RESOLUTION_RESERVE_MS = 5_000;
+// Obergrenze einer einzelnen Quellenauflösung (zwei HTTP-Aufrufe à 3 s). Es wird
 // keine neue Auflösung mehr gestartet, wenn sie das Zeitbudget reißen könnte.
-const RESOLVE_MAX_MS = 9_000;
+const RESOLVE_MAX_MS = 5_000;
+// Wie viele Vorfälle höchstens gegen ihre Quelle datumsgeprüft werden. Gemessen
+// dauert eine Auflösung im Schnitt gut eine Sekunde; bei sechs parallel ist das
+// Feld damit in gut zwei Sekunden abgearbeitet.
+const MAX_DATE_RESOLUTIONS = 8;
 
 // Ergebnis-Cache: der letzte Lagebericht je Region liegt unter dem
 // regionsspezifischen Schlüssel und wird von /api/scan-status ausgeliefert,
@@ -55,7 +76,7 @@ const SCAN_STORE = "scans";
 const WINDOW_DAYS = 30;
 // Obergrenze der an das Modell übergebenen Artikel, damit der Prompt kompakt
 // bleibt und die Klassifikation schnell und günstig ist.
-const MAX_ARTICLES = 45;
+const MAX_ARTICLES = 30;
 
 // -----------------------------------------------------------------------------
 // Regionen
@@ -163,6 +184,8 @@ STRIKTE REGELN:
 3. Gib für jeden Vorfall ein möglichst genaues Datum ("YYYY-MM-DD") und den Ort im Fokusgebiet an. Nutze dafür das Veröffentlichungsdatum bzw. den Inhalt des Artikels. Verwirf Meldungen, die außerhalb des Fokusgebiets liegen.
 4. Nicht jeder Artikel ist ein sicherheitsrelevanter Vorfall. Verwirf themenfremde Treffer (Sport, Politik ohne Infrastrukturbezug, Wirtschaft allgemein). Findest du keine belegten Vorfälle, gib eine leere Liste zurück.
 5. REFERENZIERUNG IM LAGEBERICHT: Nenne Quellen im "summary" IMMER einheitlich mit ihrem Medien-/Quellennamen im Fließtext (z.B. „laut Tagesschau", „wie der NDR berichtet", „einer Meldung von Reuters zufolge"). Verwende NIEMALS die laufende Nummer aus der Artikelliste und schreibe NIEMALS „(Quelle 3)", „Quelle 5" o.Ä. Die Nummerierung der übergebenen Liste dient nur deiner internen Zuordnung und ist dem Leser nicht sichtbar.
+
+6. UMFANG: Gib HÖCHSTENS ${MAX_INCIDENTS} Vorfälle aus, die schwerwiegendsten zuerst. Halte "description" auf ein bis zwei Sätze und den Lagebericht auf höchstens fünf Sätze. Eine längere Antwort läuft in das Zeitlimit dieses Durchlaufs und geht dadurch vollständig verloren — Kürze ist hier keine Stilfrage, sondern Voraussetzung dafür, dass das Ergebnis überhaupt ankommt.
 
 BERECHNUNG DES RISIKO-SCORES (0-100):
 - 35-45 (BASELINE): Keine neuen Vorfälle, aber anhaltende hybride Bedrohungslage (Status Quo).
@@ -297,7 +320,7 @@ async function fetchFeed(url: string): Promise<Article[]> {
       "User-Agent": "Infrastruktur-Radar/1.0 (+netlify function)",
       Accept: "application/rss+xml, application/xml, text/xml",
     },
-    signal: AbortSignal.timeout(8_000),
+    signal: AbortSignal.timeout(5_000),
   });
   if (!res.ok) throw new Error(`Feed ${hostOf(url)} antwortete mit ${res.status}`);
   const xml = await res.text();
@@ -426,7 +449,7 @@ async function fetchHtml(
       Accept: "text/html,application/xhtml+xml",
     },
     redirect: "follow",
-    signal: AbortSignal.timeout(4_000),
+    signal: AbortSignal.timeout(3_000),
   });
   if (!res.ok) return null;
   const html = await res.text();
@@ -715,7 +738,13 @@ export default async (req: Request, context: Context) => {
     }
 
     // 3) Jeden Vorfall gegen die echten Artikel-URLs als "verified" markieren.
-    const incidents = Array.isArray(analysis.incidents) ? analysis.incidents : [];
+    // Die Obergrenze steht im Prompt, wird hier aber noch einmal durchgesetzt:
+    // Ein Modell hält sich nicht zwingend daran, und eine überlange Liste
+    // kostet danach in der Datumsprüfung genau die Zeit, die fehlt.
+    const incidents = (Array.isArray(analysis.incidents) ? analysis.incidents : []).slice(
+      0,
+      MAX_INCIDENTS,
+    );
     for (const inc of incidents) {
       const url: string = inc.sourceUrl || "";
       inc.verified = !!url && (sourceUrls.has(url) || sourceHosts.has(hostOf(url)));
@@ -732,7 +761,14 @@ export default async (req: Request, context: Context) => {
     //     Zeitbudget der Funktion eingehalten wird.
     let dateAdjustments = 0;
     let dateResolutionSkipped = 0;
-    await mapLimit(incidents, 6, async (inc: any) => {
+    // Nur die ersten Vorfälle prüfen. Das Modell gibt sie nach Schwere sortiert
+    // aus, die vorderen sind also die, bei denen ein falsches Datum am meisten
+    // stört. Die übrigen behalten ihr gemeldetes Datum — dasselbe Verhalten wie
+    // bei einer fehlgeschlagenen Auflösung.
+    if (incidents.length > MAX_DATE_RESOLUTIONS) {
+      dateResolutionSkipped += incidents.length - MAX_DATE_RESOLUTIONS;
+    }
+    await mapLimit(incidents.slice(0, MAX_DATE_RESOLUTIONS), 6, async (inc: any) => {
       const url: string = inc.sourceUrl || "";
       if (!url) return;
       // Nur Quellen auflösen, die in Schritt 3 gegen die tatsächlich

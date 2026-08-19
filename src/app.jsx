@@ -357,10 +357,20 @@ const App = () => {
             try {
                 payload = rawBody ? JSON.parse(rawBody) : {};
             } catch (parseErr) {
+                // Ein 504 ist eindeutig: Die Plattform hat die Function wegen
+                // Zeitüberschreitung abgebrochen und eine HTML-Seite geschickt.
+                // Das mit „AI Gateway noch nicht aktiv" zu vermengen, schickte
+                // die Fehlersuche früher in die falsche Richtung — ein fehlendes
+                // Gateway liefert schnell einen Baseline-Bericht, keinen 504.
                 throw new Error(
-                    `Der Analyse-Dienst hat keine gültige JSON-Antwort geliefert (Status ${response.status}). `
-                    + `Meist überschreitet die Live-Auswertung dann das Zeitlimit der Function oder das AI Gateway `
-                    + `ist noch nicht aktiv (erst nach mindestens einem Produktions-Deployment). Bitte den Scan erneut starten.`
+                    response.status === 504
+                        ? `Die Auswertung hat das Zeitlimit der Function überschritten (Status 504) und wurde von der `
+                          + `Plattform abgebrochen. Der zuletzt gespeicherte Lagebericht bleibt sichtbar. Tritt das wiederholt auf, `
+                          + `ist der Durchlauf für das Zeitlimit zu umfangreich — Stellschrauben sind SCAN_BUDGET_MS und die Zahl `
+                          + `der ausgewerteten Artikel.`
+                        : `Der Analyse-Dienst hat keine gültige JSON-Antwort geliefert (Status ${response.status}). `
+                          + `Bitte den Scan erneut starten. Hinweis: Das AI Gateway ist erst nach mindestens einem `
+                          + `Produktions-Deployment aktiv.`
                 );
             }
             if (!response.ok) {
