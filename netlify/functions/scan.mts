@@ -188,8 +188,19 @@ interface Article {
 // Suchfeed. Jede Query liefert echte, datierte, verlinkte Treffer. Die
 // Queries stehen in der jeweiligen RegionConfig (siehe oben) und sind der
 // zentrale Qualitätshebel.
+// Der Suchoperator `when:<n>d` ist entscheidend und darf nicht wegfallen:
+// Google News sortiert die RSS-Suche nach RELEVANZ, nicht nach Datum. Ohne ihn
+// liefert eine Query überwiegend die thematisch besten Treffer der letzten
+// Jahre, die der 30-Tage-Filter anschließend fast vollständig verwirft.
+// Gemessen am 19.08.2026: „Sabotage kritische Infrastruktur Deutschland" gab 47
+// Treffer, davon 0 aus dem Fenster (neuester 13.06.2026); „Drohnensichtung
+// Bundeswehr Kaserne" 21 Treffer, neuester vom 31.10.2025. Über alle Regionen
+// blieben von rund 830 geholten Artikeln 25 übrig. Mit dem Operator holt die
+// Suche direkt das Fenster: Deutschland 4 → 17, restliche EU 4 → 45 Artikel.
+// Der Wert wird aus WINDOW_DAYS abgeleitet, damit Fenster und Suche nicht
+// auseinanderlaufen können.
 function googleNewsUrl(query: string, locale: NewsLocale): string {
-  const q = encodeURIComponent(query);
+  const q = encodeURIComponent(`${query} when:${WINDOW_DAYS}d`);
   return `https://news.google.com/rss/search?q=${q}&hl=${locale.hl}&gl=${locale.gl}&ceid=${locale.ceid}`;
 }
 
