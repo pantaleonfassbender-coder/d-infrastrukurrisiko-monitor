@@ -1,6 +1,17 @@
 [build]
   publish = "."
-  command = "# No build command needed for runtime JSX"
+  # Kein Build auf Netlify: app.js und styles.css werden lokal mit `npm run
+  # build` erzeugt und mitverwaltet. Netlify liefert also weiterhin nur
+  # statische Dateien aus. Wer src/app.jsx oder Klassennamen ändert, muss den
+  # Build laufen lassen — sonst zeigt die Seite den alten Stand.
+  command = "# Kein Build noetig: app.js und styles.css liegen fertig im Repo"
+
+# Die vendorierten Bibliotheken sind versionsfest: eine andere React-Fassung
+# käme unter einem anderen Dateinamen. Entsprechend hart zwischenspeichern.
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 
 [functions]
   directory = "netlify/functions"

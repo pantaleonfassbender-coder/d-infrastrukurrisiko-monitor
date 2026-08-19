@@ -1,17 +1,26 @@
 {
-  "name": "repo",
+  "name": "infrastruktur-radar",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "OSINT-Lagebild zu Angriffen auf kritische Infrastruktur in Deutschland, im Baltikum und Polen sowie in der übrigen EU, aus öffentlichen Nachrichtenquellen der letzten 30 Tage.",
+  "private": true,
+  "author": "Dr. Pantaleon Fassbender <pantaleonfassbender@gmail.com>",
+  "license": "UNLICENSED",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm run build:js && npm run build:css",
+    "build:js": "babel src/app.jsx --presets @babel/preset-react --out-file app.js --no-babelrc",
+    "build:css": "tailwindcss -c tailwind.config.js -i src/input.css -o styles.css --minify",
+    "dev": "netlify dev"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "@google/genai": "^2.12.0",
     "@netlify/blobs": "^10.7.9",
     "@netlify/functions": "^5.3.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.28.3",
+    "@babel/core": "^7.28.4",
+    "@babel/preset-react": "^7.27.1",
+    "tailwindcss": "^3.4.18"
   }
 }

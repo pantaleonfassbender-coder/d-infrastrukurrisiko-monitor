@@ -83,14 +83,12 @@
     Werbetechnik, und es wird nichts in Local Storage, Session Storage oder IndexedDB abgelegt.
   </p>
 
-  <div class="box">
-    <p><strong>Eine Einschränkung, die hierher gehört.</strong> Die Anwendung lädt ihre Programmbibliotheken
-      (React, ReactDOM, Babel und Tailwind CSS) beim Aufruf von den öffentlichen Verteilnetzen
-      <code>unpkg.com</code> und <code>cdn.tailwindcss.com</code>. Wie bei jedem Abruf von einem fremden Server wird
-      dabei Ihre IP-Adresse an deren Betreiber übermittelt, bevor die Seite erscheint. Rechtsgrundlage:
-      Art. 6 Abs. 1 lit. f DSGVO. Werden diese Dateien künftig mitgeliefert statt nachgeladen, entfällt diese
-      Übermittlung und dieser Absatz wird gestrichen.</p>
-  </div>
+  <p>
+    Die Seite lädt auch <strong>nichts von fremden Servern</strong> — keine Schriften, keine Skripte, keine Bilder,
+    keine Stylesheets. Programmbibliotheken und Gestaltung werden von dieser Seite selbst ausgeliefert. Der Aufruf
+    kontaktiert genau einen Host: den in Ihrer Adresszeile. Sie verlassen ihn erst, wenn Sie im Lagebild eine Quelle
+    anklicken.
+  </p>
 
   <h2>Server-Logs</h2>
   <p>
@@ -147,9 +145,9 @@
   <h2>Empfänger</h2>
   <p>
     Die Netlify, Inc. als Hoster, Betreiberin des AI Gateway und des Zwischenspeichers; die Google LLC als Anbieterin
-    des Gemini-Modells sowie als Betreiberin der abgerufenen Nachrichtenfeeds; die Betreiber der oben genannten
-    Verteilnetze für die Programmbibliotheken. Alle in den Vereinigten Staaten. Ein Verkauf oder eine Weitergabe zu
-    Marketingzwecken findet nicht statt.
+    des Gemini-Modells sowie als Betreiberin der abgerufenen Nachrichtenfeeds. Beide in den Vereinigten Staaten.
+    Google erhält dabei nur, was der Server zur Auswertung übergibt — nicht deshalb etwas, weil Sie diese Seite
+    geöffnet haben. Ein Verkauf oder eine Weitergabe zu Marketingzwecken findet nicht statt.
   </p>
 
   <h2>Ihre Rechte</h2>
