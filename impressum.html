@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Impressum und Datenschutz · Infrastruktur-Radar</title>
+<meta name="description" content="Anbieterangabe und Datenschutzerklärung des Infrastruktur-Radars: wer die Seite betreibt, was ein Scan überträgt und an wen.">
+<!--
+  Diese Seite ist bewusst eigenständig: kein React, kein Tailwind, kein CDN.
+  Sie lädt nichts von fremden Servern und funktioniert deshalb auch dann, wenn
+  die Anwendung selbst nicht startet — eine Rechtsseite, die von der Verfügbar-
+  keit Dritter abhängt, ist im Zweifel genau dann weg, wenn man sie braucht.
+-->
+<style>
+  :root{ --navy:#1e2a56; --gold:#e0a83a; --ink:#0f172a; --muted:#475569; --line:#e2e8f0; --bg:#f8fafc; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{background:var(--navy);color:#fff;padding:34px 0 30px}
+  .wrap{max-width:820px;margin:0 auto;padding:0 22px}
+  header .eyebrow{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--gold)}
+  header h1{margin:.4rem 0 .3rem;font-size:1.75rem;line-height:1.2}
+  header p{margin:0;color:#cbd5e1;font-size:.95rem}
+  header a{color:var(--gold)}
+  main{padding:38px 0 60px}
+  h2{font-size:1.12rem;margin:2.2rem 0 .6rem;padding-top:1.1rem;border-top:1px solid var(--line)}
+  h2:first-of-type{border-top:0;padding-top:0;margin-top:0}
+  p,li{color:var(--muted);font-size:.94rem}
+  p{margin:.55rem 0}
+  ul{padding-left:1.2rem;margin:.55rem 0}
+  li{margin:.3rem 0}
+  strong{color:var(--ink)}
+  a{color:#1d4ed8}
+  address{font-style:normal;color:var(--ink);line-height:1.7}
+  .box{background:#fff;border:1px solid var(--line);border-left:3px solid var(--gold);
+       border-radius:0 8px 8px 0;padding:14px 18px;margin:1rem 0}
+  .box p{margin:.3rem 0;color:var(--ink)}
+  .stand{margin-top:2.4rem;padding-top:1rem;border-top:1px solid var(--line);font-size:.83rem;font-style:italic}
+  footer{background:var(--navy);color:#94a3b8;font-size:.82rem;padding:18px 0}
+  footer a{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Infrastruktur-Radar</div>
+    <h1>Impressum und Datenschutz</h1>
+    <p><a href="/">&larr; Zurück zum Lagebild</a></p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <h2>Anbieter</h2>
+  <address>
+    Dr. Pantaleon Fassbender<br>
+    16751 NE 5th Street<br>
+    Williston, FL 32696<br>
+    Vereinigte Staaten von Amerika
+  </address>
+  <p>E-Mail: <a href="mailto:pantaleonfassbender@gmail.com">pantaleonfassbender@gmail.com</a></p>
+  <p>
+    Für den Inhalt verantwortlich: Dr. Pantaleon Fassbender, Anschrift wie oben. Diese Website ist ein privates
+    Forschungs- und Demonstrationsprojekt einer natürlichen Person mit Wohnsitz in den Vereinigten Staaten. Sie wird
+    nicht im Auftrag einer Institution, einer Behörde, eines Arbeitgebers oder eines Verlages betrieben, es steht kein
+    Unternehmen dahinter, und sie enthält weder Werbung noch Sponsoring.
+  </p>
+
+  <h2>Verantwortlicher und anwendbares Recht</h2>
+  <p>
+    Betrieb und Hosting liegen in den Vereinigten Staaten. Weil die Seite deutschsprachig abrufbar ist, gilt für sie
+    die Datenschutz-Grundverordnung nach Art. 3 Abs. 2 DSGVO; Verantwortlicher im Sinne von Art. 4 Nr. 7 DSGVO ist der
+    oben genannte Anbieter. Für Abrufe aus dem EWR ist das eine Verarbeitung außerhalb des EWR.
+  </p>
+
+  <h2>Was diese Seite technisch ist</h2>
+  <p>
+    Eine einzelne Seite mit zwei Serverfunktionen. Es gibt <strong>kein Benutzerkonto, keine Anmeldung, kein
+    Kontaktformular und keinen Newsletter</strong>. Die Seite besitzt kein Feld, in das Sie personenbezogene Daten
+    eingeben könnten — bedient wird sie über drei Regionsreiter und eine Scan-Schaltfläche. Es werden
+    <strong>keine Cookies</strong> gesetzt, es läuft keine Reichweitenmessung, kein Tag-Manager und keine
+    Werbetechnik, und es wird nichts in Local Storage, Session Storage oder IndexedDB abgelegt.
+  </p>
+
+  <div class="box">
+    <p><strong>Eine Einschränkung, die hierher gehört.</strong> Die Anwendung lädt ihre Programmbibliotheken
+      (React, ReactDOM, Babel und Tailwind CSS) beim Aufruf von den öffentlichen Verteilnetzen
+      <code>unpkg.com</code> und <code>cdn.tailwindcss.com</code>. Wie bei jedem Abruf von einem fremden Server wird
+      dabei Ihre IP-Adresse an deren Betreiber übermittelt, bevor die Seite erscheint. Rechtsgrundlage:
+      Art. 6 Abs. 1 lit. f DSGVO. Werden diese Dateien künftig mitgeliefert statt nachgeladen, entfällt diese
+      Übermittlung und dieser Absatz wird gestrichen.</p>
+  </div>
+
+  <h2>Server-Logs</h2>
+  <p>
+    Gehostet wird bei Netlify. Wie jeder Webserver protokolliert dessen Infrastruktur die ausgelieferten Anfragen —
+    üblicherweise IP-Adresse, Zeitpunkt, angeforderte URL, HTTP-Status, übertragene Datenmenge sowie User-Agent und
+    Referrer. Das ist technisch unvermeidbar und die einzige serverseitige Erhebung; sie dient Betrieb und Sicherheit,
+    wird vom Anbieter nicht ausgewertet, und die Speicherdauer richtet sich nach den Fristen von Netlify.
+    Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO.
+  </p>
+
+  <h2>Was ein Scan auslöst</h2>
+  <p>
+    Ein Klick auf „Scan starten“ überträgt an die Serverfunktion <strong>ausschließlich die gewählte Region</strong>
+    (<code>de</code>, <code>baltics-poland</code> oder <code>eu</code>). Es werden keine Eingaben von Ihnen und keine
+    Kennungen mitgeschickt. Auf dem Server geschieht dann Folgendes:
+  </p>
+  <ul>
+    <li>Die Serverfunktion ruft die Nachrichtenfeeds von Google News und — für Deutschland — der Tagesschau ab.
+      Diese Abrufe erfolgen <strong>vom Server, nicht von Ihrem Browser</strong>; Ihre IP-Adresse wird dabei nicht an
+      Google oder die Tagesschau übermittelt.</li>
+    <li>Titel, Quelle, Datum und URL der gefundenen Artikel gehen an das Sprachmodell Google Gemini, das sie über das
+      AI Gateway von Netlify klassifiziert und daraus den Lagebericht erzeugt. Übertragen werden nur diese
+      öffentlichen Artikelangaben — nichts, was Sie eingegeben hätten.</li>
+    <li>Zur Datumsprüfung ruft der Server die verlinkten Artikelseiten selbst auf, um deren ausgewiesenes
+      Veröffentlichungsdatum zu lesen. Auch das geschieht serverseitig.</li>
+  </ul>
+  <p>
+    Rechtsgrundlage: Art. 6 Abs. 1 lit. b und lit. f DSGVO — die Erbringung der von Ihnen ausgelösten Auswertung.
+  </p>
+
+  <h2>Zwischenspeicher</h2>
+  <p>
+    Der zuletzt erzeugte Lagebericht je Region wird in Netlify Blobs abgelegt und beim nächsten Seitenaufruf
+    ausgeliefert, damit sofort der jüngste Stand sichtbar ist, ohne dass ein neuer Modelllauf startet. Gespeichert
+    werden dabei nur der Bericht selbst und die öffentlichen Artikelangaben — <strong>nichts über die Person, die
+    den Scan ausgelöst hat</strong>. Der Zwischenspeicher ist nicht besucherbezogen: alle Aufrufenden sehen denselben
+    Stand, und ein neuer Scan überschreibt ihn.
+  </p>
+
+  <h2>Empfänger</h2>
+  <p>
+    Die Netlify, Inc. als Hoster, Betreiberin des AI Gateway und des Zwischenspeichers; die Google LLC als Anbieterin
+    des Gemini-Modells sowie als Betreiberin der abgerufenen Nachrichtenfeeds; die Betreiber der oben genannten
+    Verteilnetze für die Programmbibliotheken. Alle in den Vereinigten Staaten. Ein Verkauf oder eine Weitergabe zu
+    Marketingzwecken findet nicht statt.
+  </p>
+
+  <h2>Ihre Rechte</h2>
+  <p>
+    Sie haben das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung
+    (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch (Art. 21), außerdem nach Art. 77 ein Beschwerderecht bei
+    einer Aufsichtsbehörde. Anfragen an die oben genannte Adresse. Die Antwort fällt kurz aus, weil außer den
+    Server-Logs nichts über Sie vorliegt — die Seite kennt Sie nicht.
+  </p>
+  <p>
+    Ein Vertreter in der Union nach Art. 27 DSGVO ist nicht benannt. Der Anbieter stützt sich auf die Ausnahme des
+    Art. 27 Abs. 2 lit. a: gelegentliche Verarbeitung, keine umfangreiche Verarbeitung besonderer Datenkategorien,
+    kein voraussichtliches Risiko für die Rechte und Freiheiten natürlicher Personen. Sollte die Einschätzung nicht
+    mehr zutreffen, wird ein Vertreter benannt und hier genannt.
+  </p>
+
+  <h2>Hinweis für Nutzerinnen und Nutzer aus Kalifornien</h2>
+  <p>
+    Nach dem California Online Privacy Protection Act (Cal. Bus. &amp; Prof. Code §§ 22575–22579): Erhoben werden
+    Angaben zur Netzwerkaktivität in Gestalt der oben beschriebenen Server-Logs. Name, Anschrift, E-Mail-Adresse oder
+    Telefonnummer werden nicht erhoben — die Seite besitzt kein Feld zu ihrer Eingabe. Benutzerkonten und gespeicherte
+    Profile gibt es nicht, es existiert also kein Datensatz zur Einsicht oder Änderung. <strong>Do Not Track:</strong>
+    Diese Seite verfolgt ihre Besucher weder über die Zeit noch über fremde Websites hinweg und ändert ihr Verhalten
+    bei einem Do-Not-Track-Signal deshalb nicht — es gibt kein Tracking, das abzuschalten wäre. Wesentliche Änderungen
+    werden auf dieser Seite mit neuem Stand veröffentlicht.
+  </p>
+
+  <h2>Kinder</h2>
+  <p>
+    Diese Seite richtet sich an Erwachsene in beruflichem oder wissenschaftlichem Zusammenhang. Sie wendet sich nicht
+    an Kinder und erhebt wissentlich keine Daten von ihnen.
+  </p>
+
+  <h2>Haftung für Links</h2>
+  <p>
+    Das Lagebild verweist auf Nachrichtenartikel Dritter. Für deren Inhalte sind die jeweiligen Betreiber
+    verantwortlich. Die Verweise entstehen automatisch aus öffentlichen Nachrichtenfeeds und werden nicht einzeln
+    vorab geprüft; bei Bekanntwerden einer Rechtsverletzung wird der betreffende Verweis umgehend entfernt.
+  </p>
+
+  <h2>Keine Gewähr — und was dieses Werkzeug nicht ist</h2>
+  <p>
+    Unentgeltlich angeboten und ohne Gewähr. Das Lagebild ist eine <strong>automatische Auswertung öffentlicher
+    Nachrichtenquellen durch ein Sprachmodell</strong> und ausdrücklich <em>keine</em> behördliche Lagemeldung, keine
+    nachrichtendienstliche Bewertung und keine Grundlage für Sicherheits-, Investitions- oder sonstige Entscheidungen.
+  </p>
+  <ul>
+    <li>Der Risiko-Score ist eine heuristische Kennzahl nach den im Prompt hinterlegten Stufen — kein etabliertes,
+      extern validiertes Maß und nicht mit anderen Indizes vergleichbar.</li>
+    <li>„Verifiziert“ bedeutet ausschließlich, dass die vom Modell genannte Quell-URL zu einem tatsächlich
+      abgerufenen Artikel gehört. Es bedeutet <em>nicht</em>, dass der Vorfall selbst bestätigt ist oder dass der
+      Artikel zutrifft.</li>
+    <li>Zusammenfassung, Einordnung, Ort, Kategorie und Schweregrad stammen vom Modell und können falsch sein.</li>
+    <li>Ein leeres Lagebild heißt nicht, dass nichts geschehen ist — es heißt, dass die abgefragten Feeds in diesem
+      Durchlauf nichts Belegbares hergaben.</li>
+  </ul>
+  <p>Prüfen Sie jede Angabe an der verlinkten Quelle nach, bevor Sie etwas darauf gründen.</p>
+
+  <h2>Urheberrecht</h2>
+  <p>
+    Die verlinkte Präsentation <em>Infrastruktur und Sabotage</em> und die Gestaltung dieser Seite sind eigene Werke
+    des Anbieters. Die im Lagebild angezeigten Artikeltitel und Verweise stammen aus öffentlichen Nachrichtenfeeds;
+    die Rechte daran liegen bei den jeweiligen Verlagen.
+  </p>
+
+  <p class="stand">
+    Stand: 19. August 2026. Sollten diese Erklärung und das Verhalten der Seite jemals auseinandergehen, ist die
+    Erklärung falsch und wird korrigiert — die Beschreibung folgt dem Code, nicht umgekehrt.
+  </p>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    &copy; 2026 Dr. Pantaleon Fassbender ·
+    <a href="mailto:pantaleonfassbender@gmail.com">pantaleonfassbender@gmail.com</a> ·
+    <a href="/">Lagebild</a>
+  </div>
+</footer>
+
+</body>
+</html>
