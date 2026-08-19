@@ -182,6 +182,9 @@ interface Article {
   url: string;
   source: string;
   pubDate: string; // ISO-String, sofern parsebar
+  // Nur für die Stichwortprüfung der Tagesschau-Feeds. Der Anriss wird bewusst
+  // NICHT an das Modell übergeben, damit der Prompt kompakt bleibt.
+  description: string;
 }
 
 // Gezieltes Query-Set je Region für den schlüsselfreien Google-News-RSS-
@@ -204,10 +207,21 @@ function googleNewsUrl(query: string, locale: NewsLocale): string {
   return `https://news.google.com/rss/search?q=${q}&hl=${locale.hl}&gl=${locale.gl}&ceid=${locale.ceid}`;
 }
 
-// Der allgemeine Tagesschau-Feed. Er ist thematisch breit, daher werden seine
-// Treffer unten per Stichwort auf sicherheitsrelevante Themen gefiltert, bevor
-// sie an das Modell gehen.
-const TAGESSCHAU_FEED = "https://www.tagesschau.de/index~rss2.xml";
+// Tagesschau-Feeds. Der allgemeine Feed allein trug praktisch nichts bei: Am
+// 19.08.2026 blieb von 79 Meldungen nach dem Stichwortfilter genau eine übrig —
+// „Wie Drohnen und KI zum Brandschutz in Waldgebieten eingesetzt werden können",
+// also ein Fehltreffer auf „drohnen" und kein Sicherheitsvorfall. Die
+// Ressort-Feeds liefern das eigentliche Material: `investigativ` allein brachte
+// 13 Treffer, darunter die Drohnenvorfälle am Flughafen Leipzig/Halle und der
+// verdächtige Drohnenflug über der „Patriot-Werft". `wirtschaft` trug nichts bei
+// und bleibt draußen. Überschneidungen der Feeds fängt die URL-Deduplizierung
+// in collectArticles ab.
+const TAGESSCHAU_FEEDS = [
+  "https://www.tagesschau.de/index~rss2.xml",
+  "https://www.tagesschau.de/inland/index~rss2.xml",
+  "https://www.tagesschau.de/ausland/index~rss2.xml",
+  "https://www.tagesschau.de/investigativ/index~rss2.xml",
+];
 
 const TAGESSCHAU_KEYWORDS = [
   "sabotage", "drohne", "drohnen", "anschlag", "brandanschlag", "cyber",
@@ -253,6 +267,7 @@ function parseRss(xml: string): Article[] {
       url: link,
       source,
       pubDate: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : "",
+      description: tag(block, "description"),
     });
   }
   return items;
@@ -454,7 +469,14 @@ function withinWindow(article: Article, now: number): boolean {
 }
 
 function isTagesschauRelevant(article: Article): boolean {
-  const hay = article.title.toLowerCase();
+  // Titel UND Anriss prüfen. Der Titel allein ist zu eng: Tagesschau-Titel sind
+  // oft anspielungsreich formuliert („Die Methode ‚Drohne'"), das Stichwort
+  // steht dann erst im Anriss. Am 19.08.2026 verdoppelte die Prüfung beider
+  // Felder die Trefferzahl über die vier Feeds. Falschpositive nimmt das in
+  // Kauf — das Modell ist ausdrücklich angewiesen, themenfremde Artikel zu
+  // verwerfen, und ein Fehltreffer kostet nur Prompt-Platz, während eine
+  // verpasste Meldung im Lagebild fehlt.
+  const hay = `${article.title} ${article.description}`.toLowerCase();
   // Wortgrenzen verhindern Teilstring-Fehltreffer (z.B. "hybrid" in
   // "Hybridrasen" oder "bahn" in "Autobahn").
   return TAGESSCHAU_KEYWORDS.some((kw) =>
@@ -476,7 +498,7 @@ async function collectArticles(
       tagesschau: false,
     })),
     ...(region.includeTagesschau
-      ? [{ url: TAGESSCHAU_FEED, tagesschau: true }]
+      ? TAGESSCHAU_FEEDS.map((url) => ({ url, tagesschau: true }))
       : []),
   ];
 
