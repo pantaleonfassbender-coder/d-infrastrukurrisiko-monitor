@@ -671,6 +671,17 @@ export default async (req: Request, _context: Context) => {
     await mapLimit(incidents, 6, async (inc: any) => {
       const url: string = inc.sourceUrl || "";
       if (!url) return;
+      // Nur Quellen auflösen, die in Schritt 3 gegen die tatsächlich
+      // abgerufene Artikelliste verifiziert wurden. Ohne diese Sperre ruft der
+      // Server jede URL ab, die das Modell ausgibt — und das Modell erzeugt
+      // seine Ausgabe aus Artikeltiteln, die von Dritten stammen und damit
+      // manipulierbar sind. Eine erfundene oder untergeschobene Adresse (etwa
+      // ein internes Ziel im Netz der Function) würde sonst serverseitig
+      // angefragt. `verified` ist genau die Prüfung, die das ausschließt, und
+      // stand bereits zur Verfügung; sie wurde hier nur nicht angewandt.
+      // `looksLikeArticleUrl` fängt zusätzlich Nicht-HTTP-Schemata und Assets
+      // ab, bevor überhaupt ein Abruf stattfindet.
+      if (!inc.verified || !looksLikeArticleUrl(url)) return;
       // Zeitbudget wahren: Es wird keine neue Auflösung mehr begonnen, wenn sie
       // (inkl. ihrer eigenen Obergrenze RESOLVE_MAX_MS und der Antwort-Reserve)
       // das Gesamtbudget reißen könnte. Der Vorfall behält dann sein vom
