@@ -704,15 +704,25 @@ export default async (req: Request, context: Context) => {
       // wie knapp — und genau das braucht man, um die Konstanten zu setzen.
       const tried: string[] = [];
 
-      for (const candidate of MODEL_CHAIN) {
-        const modelTimeoutMs = modelDeadline - Date.now();
+      for (let i = 0; i < MODEL_CHAIN.length; i += 1) {
+        const candidate = MODEL_CHAIN[i];
+        const remaining = modelDeadline - Date.now();
         // Untergrenze, unter der ein Versuch nicht mehr lohnt. Sie liegt
         // bewusst niedrig: Ein Ausweichmodell ist oft gerade deshalb
         // interessant, weil es schneller antwortet als das erste.
-        if (modelTimeoutMs < 5_000) {
+        if (remaining < 5_000) {
           lastError ||= "Für einen weiteren Modellversuch blieb keine Zeit.";
           break;
         }
+        // Das Fenster wird geteilt, statt es dem ersten Versuch ganz zu geben.
+        // Genau daran scheiterte die Ausweichkette vorher: Der erste Kandidat
+        // bekam die volle Restzeit, lief hinein — und danach war per
+        // Konstruktion nichts mehr übrig, sodass nie ein zweites Modell an die
+        // Reihe kam. Der letzte Kandidat darf den Rest ausschöpfen.
+        const isLast = i === MODEL_CHAIN.length - 1;
+        const modelTimeoutMs = isLast
+          ? remaining
+          : Math.min(remaining, Math.max(8_000, Math.floor(remaining * 0.6)));
         lastTimeoutMs = modelTimeoutMs;
         tried.push(`${candidate} (${Math.round(modelTimeoutMs / 1000)} s)`);
         try {
@@ -761,12 +771,10 @@ export default async (req: Request, context: Context) => {
             modelError?.name === "TimeoutError" ||
             /abort|timed?\s*out|timeout|deadline/i.test(lastError);
           console.error(`scan: Modell "${candidate}" fehlgeschlagen:`, lastError);
-          // Früher brach die Kette bei einer Zeitüberschreitung sofort ab, mit
-          // der Begründung, für einen zweiten Versuch sei ohnehin keine Zeit.
-          // Das war falsch herum gedacht: Wenn das erste Modell zu langsam ist,
-          // ist ein schnelleres genau die Rettung — sofern noch Zeit bleibt.
-          // Ob sie bleibt, entscheidet die Prüfung am Schleifenanfang.
-          if (lastTimedOut && modelDeadline - Date.now() < 5_000) break;
+          // Nach einer Zeitüberschreitung wird NICHT abgebrochen: Ist das
+          // erste Modell zu langsam, ist ein schnelleres genau die Rettung.
+          // Ob dafür noch Zeit bleibt, entscheidet die Prüfung am
+          // Schleifenanfang — hier braucht es keine zweite Bedingung.
         }
       }
 
