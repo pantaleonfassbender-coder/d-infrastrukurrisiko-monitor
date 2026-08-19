@@ -1,30 +1,35 @@
 import type { Config, Context } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 
-// Muss zum Store-Namen und den regionsspezifischen Schlüsseln aus scan.mts passen.
-const SCAN_STORE = "scans";
-const CACHE_KEYS: Record<string, string> = {
-  de: "latest",
-  "baltics-poland": "latest-baltics-poland",
-  eu: "latest-eu",
-};
+import { SCAN_STORE, resolveRegion } from "../lib/scan-core.mts";
 
-// Liefert den zuletzt gecachten Lagebericht der angefragten Region. Der Client
-// lädt ihn beim Öffnen der Seite je Tab, damit sofort der jüngste bekannte
-// Stand sichtbar ist, ohne einen neuen Modelllauf auszulösen. Der Scan selbst
-// läuft synchron über /api/scan.
+/*
+ * Statusabfrage je Region.
+ *
+ * Sie hat jetzt zwei Aufgaben: Beim Öffnen der Seite liefert sie den zuletzt
+ * erzeugten Lagebericht, und während eines Laufs ist sie die Leitung, über die
+ * der Browser den Fortschritt verfolgt. Der Datensatz trägt deshalb immer ein
+ * `status`-Feld:
+ *
+ *   empty    — für diese Region liegt noch nichts vor
+ *   running  — ein Hintergrundlauf ist unterwegs (`startedAt`)
+ *   done     — `result` ist der fertige Lagebericht
+ *   error    — `message` sagt warum; `result` ist, sofern vorhanden, der
+ *              zuletzt gültige Bericht und bleibt anzeigbar
+ *
+ * In den Fällen `running` und `error` wird ein vorhandener älterer Bericht
+ * mitgeschickt. Ohne ihn stünde die Seite während jedes Laufs leer da und
+ * behauptete damit etwas, das nicht stimmt.
+ */
+
 export default async (req: Request, _context: Context) => {
-  const region = new URL(req.url).searchParams.get("region") ?? "de";
-  const key = CACHE_KEYS[region] ?? CACHE_KEYS.de;
-
+  const region = resolveRegion(new URL(req.url).searchParams.get("region"));
   const store = getStore({ name: SCAN_STORE, consistency: "strong" });
-  const record = await store.get(key, { type: "json" });
+  const record = await store.get(region.cacheKey, { type: "json" });
 
-  if (!record) {
-    return Response.json({ status: "empty" });
-  }
+  if (!record) return Response.json({ status: "empty", region: region.id });
 
-  return Response.json(record);
+  return Response.json({ region: region.id, ...(record as object) });
 };
 
 export const config: Config = {

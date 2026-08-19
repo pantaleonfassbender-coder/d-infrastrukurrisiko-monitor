@@ -483,6 +483,68 @@ const App = () => {
   const [errorByRegion, setErrorByRegion] = useState({});
   const [logs, setLogs] = useState([]);
   const logEndRef = useRef(null);
+
+  // Wie oft und wie lange der Fortschritt abgefragt wird. Ein Lauf dauert
+  // typischerweise unter einer Minute; die Obergrenze ist grosszuegig, weil
+  // ein Hintergrundlauf bis zu 15 Minuten laufen darf und ein vorzeitiges
+  // Aufgeben des Browsers den Lauf nicht stoppen wuerde — es wuerde nur
+  // dessen Ergebnis verschweigen.
+  const POLL_INTERVAL_MS = 2500;
+  const POLL_MAX_MS = 6 * 60 * 1000;
+
+  // Ein fertiges Ergebnis anzeigen und protokollieren. Wird sowohl vom
+  // Fortschrittsabruf als auch beim Oeffnen der Seite benutzt, damit beide
+  // Wege exakt dasselbe tun.
+  const applyResult = (region, meta, result, quiet) => {
+    const incidents = Array.isArray(result.incidents) ? result.incidents : [];
+    const verifiedCount = incidents.filter(i => i.verified).length;
+    setDataByRegion(prev => ({
+      ...prev,
+      [region]: result
+    }));
+    if (quiet) return;
+    addLog(`„${meta.label}“: Analyse abgeschlossen (Engine: ${result.model}).`, "success");
+    addLog(`„${meta.label}“: ${(result.sources || []).length} Artikel ausgewertet.`, "info");
+    addLog(`„${meta.label}“: ${incidents.length} Vorfall/Vorfälle erkannt, ${verifiedCount} durch Quellen verifiziert.`, "success");
+    if (result.dateAdjustments > 0) {
+      addLog(`„${meta.label}“: ${result.dateAdjustments} Vorfallsdatum/-daten an das echte Veröffentlichungsdatum der Quelle angeglichen.`, "info");
+    }
+    if (result.staleRemoved > 0) {
+      addLog(`„${meta.label}“: ${result.staleRemoved} wieder hochgespülte Altmeldung(en) außerhalb des 30-Tage-Fensters verworfen.`, "warning");
+    }
+    if (result.degraded) {
+      addLog(`„${meta.label}“: KI-Auswertung nicht zustande gekommen — ${result.degradedReason || 'Grund unbekannt'}`, "warning");
+    }
+  };
+
+  // Den Fortschritt verfolgen, bis der Hintergrundlauf fertig ist.
+  const pollUntilDone = async (region, meta) => {
+    const until = Date.now() + POLL_MAX_MS;
+    let announced = false;
+    while (Date.now() < until) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+      let record;
+      try {
+        const res = await fetch(`/api/scan-status?region=${region}`);
+        if (!res.ok) continue; // vorübergehende Störung: weiterfragen
+        record = await res.json();
+      } catch (e) {
+        continue; // Netz kurz weg: weiterfragen
+      }
+      if (record.status === "done" && record.result) {
+        applyResult(region, meta, record.result, false);
+        return;
+      }
+      if (record.status === "error") {
+        throw new Error(record.message || "Der Hintergrundlauf ist fehlgeschlagen.");
+      }
+      if (record.status === "running" && !announced) {
+        announced = true;
+        addLog(`„${meta.label}“: Lauf angenommen, Auswertung läuft im Hintergrund…`, "info");
+      }
+    }
+    throw new Error(`Der Lauf „${meta.label}“ hat nach ${Math.round(POLL_MAX_MS / 60000)} Minuten noch kein Ergebnis geliefert. ` + `Er läuft möglicherweise weiter — ein erneutes Öffnen der Seite zeigt das Ergebnis, sobald es vorliegt.`);
+  };
   useEffect(() => {
     if (logEndRef.current) {
       logEndRef.current.scrollIntoView({
@@ -510,12 +572,41 @@ const App = () => {
           const res = await fetch(`/api/scan-status?region=${r.id}`);
           if (!res.ok) continue;
           const record = await res.json();
-          if (!cancelled && record?.status === 'done' && record.result) {
+          if (cancelled || !record) continue;
+
+          // Ein vorhandener Bericht wird in jedem Fall gezeigt — auch
+          // waehrend ein neuer Lauf unterwegs ist und auch dann, wenn
+          // der letzte Lauf gescheitert ist. Ihn zurueckzuhalten
+          // hiesse, einen gueltigen Stand zu verschweigen.
+          if (record.result) {
             setDataByRegion(prev => ({
               ...prev,
               [r.id]: record.result
             }));
             addLog(`Letzter Stand „${r.label}“ geladen (${new Date(record.result.generatedAt).toLocaleString('de-DE')}).`, "info");
+          }
+
+          // Laeuft im Hintergrund noch ein Durchgang — etwa weil die
+          // Seite zwischendurch geschlossen wurde —, wird er hier
+          // wieder aufgegriffen, statt ihn ins Leere laufen zu lassen.
+          if (record.status === 'running') {
+            addLog(`„${r.label}“: Ein Durchgang läuft bereits — Fortschritt wird verfolgt.`, "info");
+            setScanningByRegion(prev => ({
+              ...prev,
+              [r.id]: true
+            }));
+            pollUntilDone(r.id, r).catch(err => {
+              setErrorByRegion(prev => ({
+                ...prev,
+                [r.id]: err.message
+              }));
+              addLog(`„${r.label}“: ${err.message}`, "error");
+            }).finally(() => setScanningByRegion(prev => ({
+              ...prev,
+              [r.id]: false
+            })));
+          } else if (record.status === 'error' && record.message) {
+            addLog(`„${r.label}“: Letzter Durchgang fehlgeschlagen — ${record.message}`, "warning");
           }
         } catch (e) {
           /* Kein Cache vorhanden – stiller Start. */
@@ -539,9 +630,10 @@ const App = () => {
     addLog(`Starte OSINT-Scan „${meta.label}“ via Netlify AI Gateway (Google Gemini)...`, "info");
     addLog(`„${meta.label}“: Quellen: ${meta.sub}`, "info");
     try {
-      // Die Nachrichten kommen aus echten RSS-Feeds und werden von
-      // Gemini nur klassifiziert. Das läuft in Sekunden, daher ein
-      // einziger synchroner Aufruf statt Hintergrundjob + Polling.
+      // Der Aufruf stoesst nur an und antwortet sofort; gerechnet wird im
+      // Hintergrund. Frueher wartete dieser Aufruf auf das fertige
+      // Ergebnis und musste dafuer in das Zeitlimit synchroner Functions
+      // passen — was fuer eine Modellauswertung nicht reichte.
       const response = await fetch('/api/scan', {
         method: 'POST',
         headers: {
@@ -551,47 +643,20 @@ const App = () => {
           region
         })
       });
-
-      // Die Antwort defensiv lesen: Bei einem Zeitlimit- oder
-      // Gateway-Fehler liefert die Plattform eine HTML-Seite statt
-      // JSON. Ein direktes response.json() würde daran mit dem
-      // kryptischen „Unexpected token '<'" scheitern – deshalb erst
-      // den Text lesen und kontrolliert parsen.
       const rawBody = await response.text();
       let payload;
       try {
         payload = rawBody ? JSON.parse(rawBody) : {};
       } catch (parseErr) {
-        // Ein 504 ist eindeutig: Die Plattform hat die Function wegen
-        // Zeitüberschreitung abgebrochen und eine HTML-Seite geschickt.
-        // Das mit „AI Gateway noch nicht aktiv" zu vermengen, schickte
-        // die Fehlersuche früher in die falsche Richtung — ein fehlendes
-        // Gateway liefert schnell einen Baseline-Bericht, keinen 504.
-        throw new Error(response.status === 504 ? `Die Auswertung hat das Zeitlimit der Function überschritten (Status 504) und wurde von der ` + `Plattform abgebrochen. Der zuletzt gespeicherte Lagebericht bleibt sichtbar. Tritt das wiederholt auf, ` + `ist der Durchlauf für das Zeitlimit zu umfangreich — Stellschrauben sind SCAN_BUDGET_MS und die Zahl ` + `der ausgewerteten Artikel.` : `Der Analyse-Dienst hat keine gültige JSON-Antwort geliefert (Status ${response.status}). ` + `Bitte den Scan erneut starten. Hinweis: Das AI Gateway ist erst nach mindestens einem ` + `Produktions-Deployment aktiv.`);
+        throw new Error(`Der Dienst hat keine gültige JSON-Antwort geliefert (Status ${response.status}). ` + `Bitte den Scan erneut starten. Hinweis: Das AI Gateway ist erst nach mindestens einem ` + `Produktions-Deployment aktiv.`);
       }
       if (!response.ok) {
         throw new Error(payload?.error || `Scan fehlgeschlagen (Status ${response.status}).`);
       }
-      const result = payload;
-      const incidents = Array.isArray(result.incidents) ? result.incidents : [];
-      const verifiedCount = incidents.filter(i => i.verified).length;
-      addLog(`„${meta.label}“: Analyse abgeschlossen (Engine: ${result.model}).`, "success");
-      addLog(`„${meta.label}“: ${(result.sources || []).length} Artikel ausgewertet.`, "info");
-      addLog(`„${meta.label}“: ${incidents.length} Vorfall/Vorfälle erkannt, ${verifiedCount} durch Quellen verifiziert.`, "success");
-      if (result.dateAdjustments > 0) {
-        addLog(`„${meta.label}“: ${result.dateAdjustments} Vorfallsdatum/-daten an das echte Veröffentlichungsdatum der Quelle angeglichen.`, "info");
+      if (payload.alreadyRunning) {
+        addLog(`„${meta.label}“: Es läuft bereits ein Durchgang — es wird kein zweiter gestartet.`, "info");
       }
-      if (result.staleRemoved > 0) {
-        addLog(`„${meta.label}“: ${result.staleRemoved} wieder hochgespülte Altmeldung(en) außerhalb des 30-Tage-Fensters verworfen.`, "warning");
-      }
-      if (result.degraded) {
-        const hasSources = (result.sources || []).length > 0;
-        addLog(`„${meta.label}“: ${hasSources ? 'KI-Auswertung nicht möglich (Zeitlimit oder Gateway) – Baseline-Lagebericht auf Basis der abgerufenen Quellen.' : 'Die Nachrichten-Feeds waren nicht erreichbar – Baseline-Lagebericht ohne aktuelle Quellen.'}`, "warning");
-      }
-      setDataByRegion(prev => ({
-        ...prev,
-        [region]: result
-      }));
+      await pollUntilDone(region, meta);
     } catch (err) {
       console.error(err);
       const msg = err.message || "Unbekannter Fehler.";
