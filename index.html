@@ -17,6 +17,9 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         #map { height: 380px; border-radius: 0.5rem; z-index: 0; }
+        /* The dashboard spans the full viewport, so the map column gets much
+           wider on large screens; a taller map keeps it from looking squat. */
+        @media (min-width: 1280px) { #map { height: 460px; } }
         .leaflet-container { font: inherit; }
     </style>
 </head>
@@ -47,7 +50,8 @@
                 <div class="p-4 bg-slate-100 rounded-lg">
                     <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Quellenbasis</div>
                     <div class="space-y-1 text-[11px] text-slate-600">
-                        <div class="flex justify-between"><span>GDELT-Artikel</span><span id="stat-gdelt" class="font-bold">–</span></div>
+                        <div class="flex justify-between"><span>Nachrichten-Artikel</span><span id="stat-news" class="font-bold">–</span></div>
+                        <div class="flex justify-between"><span>Nachrichtenquelle</span><span id="stat-provider" class="font-bold">–</span></div>
                         <div class="flex justify-between"><span>NINA-Warnungen</span><span id="stat-nina" class="font-bold">–</span></div>
                         <div class="flex justify-between"><span>Belegte Quellen</span><span id="stat-sources" class="font-bold">–</span></div>
                         <div class="flex justify-between"><span>Vorfälle (30 T.)</span><span id="stat-incidents" class="font-bold">–</span></div>
@@ -57,7 +61,8 @@
                 <div class="p-4 bg-slate-100 rounded-lg">
                     <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Methodik</div>
                     <p class="text-[10px] text-slate-500 leading-relaxed">
-                        Täglicher Scan aus drei Schichten: GDELT-Nachrichtensuche, amtliche
+                        Täglicher Scan aus drei Schichten: eine Nachrichtensuche (GDELT,
+                        bei Rate-Limit ersatzweise Google News oder tagesschau.de), amtliche
                         NINA-Warnmeldungen (BBK) und eine KI-Recherche mit Such-Grounding.
                         Nur verifizierte Ereignisse der letzten 30 Tage erhöhen den Score;
                         ohne neue Vorfälle gilt die Baseline von ~35 Punkten.
@@ -91,7 +96,7 @@
             <div id="notice" class="hidden mx-6 md:mx-8 mt-6 p-4 rounded-xl text-sm font-medium"></div>
 
             <div class="flex-1 p-6 md:p-8">
-                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 max-w-7xl mx-auto">
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 w-full">
 
                     <!-- Linke Spalte -->
                     <div class="xl:col-span-7 space-y-6 min-w-0">
@@ -131,7 +136,7 @@
                         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
                             <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Score-Verlauf (90 Tage)</h3>
                             <div id="chart-wrap" class="overflow-x-auto">
-                                <svg id="chart" width="100%" height="190" viewBox="0 0 640 190" preserveAspectRatio="none"></svg>
+                                <svg id="chart" width="100%" height="190" viewBox="0 0 640 190"></svg>
                             </div>
                             <p id="chart-empty" class="text-xs text-slate-400 text-center py-6 hidden">Noch keine Historie — sie füllt sich mit jedem täglichen Scan.</p>
                         </div>
@@ -191,6 +196,7 @@
         "use strict";
 
         const SECTOR_LABELS = { bahn: "Bahn", energie: "Energie", drohnen: "Drohnen", telekom: "Telekom", industrie: "Industrie", cyber: "Cyber", sonstige: "Sonstige" };
+        const PROVIDER_LABELS = { gdelt: "GDELT", googlenews: "Google News", tagesschau: "tagesschau.de", none: "keine" };
 
         const DEMO = new URLSearchParams(location.search).has("demo");
         const DEMO_DATA = {
@@ -214,7 +220,7 @@
                     { uri: "https://example.org/a", title: "Beispielquelle A", origin: "grounding" },
                     { uri: "https://example.org/b", title: "Beispielquelle B", origin: "grounding" }
                 ],
-                stats: { gdeltArticles: 42, ninaWarnings: 7, model: "demo", groundedModel: "demo", collectorErrors: [] }
+                stats: { newsArticles: 42, newsProvider: "gdelt", ninaWarnings: 7, model: "demo", groundedModel: "demo", collectorErrors: [] }
             },
             history: Array.from({ length: 60 }, (_, i) => {
                 const d = new Date(Date.now() - (59 - i) * 86400000);
@@ -320,10 +326,14 @@
         }
 
         // ---------- Verlauf ----------
+        /* Kept so a resize can redraw the chart at the new width. */
+        let chartHistory = [];
+
         function renderChart(history) {
+            if (history) chartHistory = history;
             const svg = el("chart");
             const empty = el("chart-empty");
-            const data = (history || []).slice(-90);
+            const data = (chartHistory || []).slice(-90);
             if (data.length < 2) {
                 svg.style.display = "none";
                 empty.classList.remove("hidden");
@@ -331,7 +341,12 @@
             }
             svg.style.display = "";
             empty.classList.add("hidden");
-            const W = 640, H = 190, padL = 30, padR = 10, padT = 12, padB = 24;
+            /* The viewBox follows the real pixel width instead of scaling a
+               fixed one: on the full-width layout a stretched viewBox would
+               smear the date labels and the data points sideways. */
+            const H = 190, padL = 30, padR = 10, padT = 12, padB = 24;
+            const W = Math.max(360, Math.round(el("chart-wrap").clientWidth || 640));
+            svg.setAttribute("viewBox", "0 0 " + W + " " + H);
             const x = (i) => padL + (i / (data.length - 1)) * (W - padL - padR);
             const y = (v) => padT + (1 - v / 100) * (H - padT - padB);
             let out = "";
@@ -410,7 +425,11 @@
 
             el("last-update").textContent = "Stand: " + fmtDateTime(latest.generatedAt);
             el("status-engine").textContent = latest.stats?.model ? "Engine: " + latest.stats.model : "";
-            el("stat-gdelt").textContent = latest.stats?.gdeltArticles ?? "–";
+            /* Runs before the tiered news layer existed only carry gdeltArticles. */
+            const newsCount = latest.stats?.newsArticles ?? latest.stats?.gdeltArticles;
+            const provider = latest.stats?.newsProvider || (newsCount ? "gdelt" : "none");
+            el("stat-news").textContent = newsCount ?? "–";
+            el("stat-provider").textContent = PROVIDER_LABELS[provider] || provider;
             el("stat-nina").textContent = latest.stats?.ninaWarnings ?? "–";
             el("stat-sources").textContent = (latest.sources || []).length;
             el("stat-incidents").textContent = (latest.incidents || []).length;
@@ -430,12 +449,39 @@
                 el("report-details").classList.remove("hidden");
                 el("report-text").textContent = latest.report;
             }
+
+            /* At most one notice, most important first: a failed attempt beats
+               a fallback news source, which beats silence. Neither case is an
+               error for the page — the Lagebild on screen stays valid, it just
+               may be older or drawn from a different source mix. */
+            const failed = !running && payload.lastRun && payload.lastRun.status === "failed";
+            if (failed) {
+                el("status-dot").className = "h-2 w-2 rounded-full bg-amber-500";
+                el("status-text").textContent = "Letzter Versuch fehlgeschlagen";
+                notice(
+                    "Der letzte Scan-Versuch ist fehlgeschlagen (" +
+                        (payload.lastRun.detail || "unbekannter Fehler") +
+                        "). Angezeigt wird das Lagebild vom " + fmtDateTime(latest.generatedAt) + ".",
+                    "warn"
+                );
+            } else if (!running && provider !== "gdelt") {
+                notice(
+                    provider === "none"
+                        ? "Hinweis: Beim letzten Lauf lieferte keine Nachrichtenquelle Schlagzeilen. Das Lagebild stützt sich auf NINA-Warnmeldungen und die KI-Recherche."
+                        : "Hinweis: GDELT war beim letzten Lauf nicht erreichbar (Rate-Limit). Die Schlagzeilen stammen aus " + (PROVIDER_LABELS[provider] || provider) + ".",
+                    "warn"
+                );
+            }
         }
 
         function notice(msg, kind) {
             const n = el("notice");
-            n.className = "mx-6 md:mx-8 mt-6 p-4 rounded-xl text-sm font-medium " +
-                (kind === "error" ? "bg-red-100 border border-red-200 text-red-700" : "bg-blue-50 border border-blue-200 text-blue-700");
+            const styles = {
+                error: "bg-red-100 border border-red-200 text-red-700",
+                warn: "bg-amber-50 border border-amber-200 text-amber-800",
+                info: "bg-blue-50 border border-blue-200 text-blue-700",
+            };
+            n.className = "mx-6 md:mx-8 mt-6 p-4 rounded-xl text-sm font-medium " + (styles[kind] || styles.info);
             n.textContent = msg;
             n.classList.remove("hidden");
         }
@@ -501,9 +547,9 @@
                     const payload = await loadReport();
                     if (payload.latest && payload.latest.generatedAt !== lastGeneratedAt) {
                         lastGeneratedAt = payload.latest.generatedAt;
+                        clearNotice();
                         render(payload);
                         setScanning(false);
-                        clearNotice();
                         return;
                     }
                     /* A run that failed after we started polling ends the wait
@@ -519,6 +565,12 @@
             setScanning(false);
             notice("Der Scan meldet sich nicht zurück. Bitte Seite später neu laden.", "error");
         }
+
+        let resizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => renderChart(null), 150);
+        });
 
         init();
     </script>

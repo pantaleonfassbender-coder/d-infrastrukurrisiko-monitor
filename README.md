@@ -13,7 +13,8 @@ Browser ── GET /api/report ──────────► report.mjs ─�
                                                          ▼
 Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Background)
                                               │ scan-run.mjs
-                                              ├─ lib/sources.mjs   GDELT DOC 2.0 + NINA (warnung.bund.de)
+                                              ├─ lib/sources.mjs   Nachrichten-Tier (GDELT → Google News → tagesschau)
+                                              │                    + NINA (warnung.bund.de)
                                               ├─ lib/gemini.mjs    Pass A: Such-Grounding (Lagebericht + Quellen)
                                               │                    Pass B: responseSchema → Score/Sektoren/Vorfälle
                                               ├─ lib/core.mjs      Validierung, Nominatim-Geocoding, Historie
@@ -21,9 +22,18 @@ Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Backgrou
 ```
 
 - **Pass A** (Google-Search-Grounding) ist Anreicherung und darf scheitern;
-  **Pass B** (strukturierte Konsolidierung von Lagebericht + GDELT + NINA) ist
-  das Produkt und muss die Validierung in `lib/core.mjs` bestehen, sonst
-  bleibt das vorige Lagebild stehen.
+  **Pass B** (strukturierte Konsolidierung von Lagebericht + Schlagzeilen +
+  NINA) ist das Produkt und muss die Validierung in `lib/core.mjs` bestehen,
+  sonst bleibt das vorige Lagebild stehen.
+- **Nachrichten-Tier:** GDELT ist die breiteste Quelle, beantwortet Anfragen
+  aus der Function-Runtime aber regelmäßig mit HTTP 429 („one request every
+  five seconds"), teils stundenlang. Die Schichten werden daher der Reihe nach
+  versucht — GDELT, dann Google News RSS, dann die tagesschau-API — und die
+  erste, die Schlagzeilen liefert, gewinnt. Welche es war, steht im Lagebild
+  (`stats.newsProvider`) und in der Seitenleiste.
+- Ein Lauf bricht nur ab, wenn *alle* Schichten leer bleiben (keine
+  Schlagzeilen, keine NINA-Meldungen, kein Grounding-Bericht). Der Ausfall
+  einer einzelnen Quelle ist kein Fehlschlag.
 - Baseline-Regel serverseitig erzwungen: ohne Vorfälle der letzten 30 Tage
   wird der Score auf 35–45 geklemmt.
 - Geocoding: Modell-Koordinaten werden nur innerhalb Deutschlands akzeptiert,
@@ -44,14 +54,16 @@ Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Backgrou
 
 ## Lokal
 
-- `node tests/core.test.mjs` — Offline-Tests der Validierungsschicht.
+- `npm test` — Offline-Tests der Validierungs- und Collector-Schicht.
 - `python -m http.server 8123` und `http://localhost:8123/index.html?demo=1`
   — Layout-Prüfung mit eingebetteten Demo-Daten, ohne Functions.
 - `netlify dev` (mit gesetzten Env-Variablen) für den vollen Stack.
 
 ## Quellen
 
-- [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) — deutschsprachige Nachrichten, letzte 30 Tage (frei, ohne Key).
+- [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) — deutschsprachige Nachrichten, letzte 30 Tage (frei, ohne Key; rate-limitiert).
+- Google News RSS (`news.google.com/rss/search`) — Ersatz-Nachrichtensuche, ohne Key.
+- [tagesschau-API](https://www.tagesschau.de/api2u/) — zweiter Ersatz, ein Anbieter, aber stabil.
 - [NINA-API des BBK](https://nina.api.bund.dev/) — MoWaS, Katwarn, Biwapp, Polizei (`warnung.bund.de/api31`).
 - Google-Search-Grounding über die Gemini API (`gemini-2.5-flash`, Fallback `gemini-2.5-pro`).
 - [Nominatim](https://nominatim.org/release-docs/latest/api/Search/) — Geocoding der Vorfallsorte.
