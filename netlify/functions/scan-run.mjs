@@ -62,6 +62,19 @@ export default async (req) => {
         (errors.length ? `, collector errors: ${errors.join("; ")}` : "")
     );
 
+    /* Every incident must cite a GDELT article, so without that pool the
+       scan cannot produce a publishable Lagebild — it stops here instead of
+       spending two Gemini calls on material that would be rejected. */
+    if (articles.length === 0) {
+      await failRun(
+        store,
+        "GDELT returned no articles" +
+          (errors.length ? ` (${errors.join("; ")})` : "") +
+          "; incidents cannot be sourced, keeping the previous Lagebild"
+      );
+      return;
+    }
+
     /* Pass A is enrichment: if grounding fails, the deterministic material
        still carries the scan. Pass B is the product and must succeed. */
     let reportText = "";
@@ -83,9 +96,13 @@ export default async (req) => {
       articles,
       warnings,
     });
-    const analysis = normalizeAnalysis(rawAnalysis);
+    const { unsourcedDropped, ...analysis } = normalizeAnalysis(rawAnalysis, {
+      sourceUrls: articles.map((a) => a.url),
+    });
     console.log(
-      `scan-run: structured analysis via ${model}: score ${analysis.score}, ${analysis.incidents.length} incidents`
+      `scan-run: structured analysis via ${model}: score ${analysis.score}, ` +
+        `${analysis.incidents.length} incidents` +
+        (unsourcedDropped ? `, ${unsourcedDropped} dropped without a GDELT source` : "")
     );
 
     const geocache = (await store.get("geocache", { type: "json" })) || {};
@@ -103,6 +120,7 @@ export default async (req) => {
       stats: {
         gdeltArticles: articles.length,
         ninaWarnings: warnings.length,
+        unsourcedIncidents: unsourcedDropped,
         model,
         groundedModel,
         collectorErrors: errors,

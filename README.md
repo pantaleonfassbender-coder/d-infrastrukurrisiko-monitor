@@ -15,7 +15,7 @@ Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Backgrou
                                               │ scan-run.mjs
                                               ├─ lib/sources.mjs   GDELT DOC 2.0 + NINA (warnung.bund.de)
                                               ├─ lib/gemini.mjs    Pass A: Such-Grounding (Lagebericht + Quellen)
-                                              │                    Pass B: responseSchema → Score/Sektoren/Vorfälle
+                                              │                    Pass B: responseSchema → Score/Sektoren/Vorfälle (quelleUrl Pflicht)
                                               ├─ lib/core.mjs      Validierung, Nominatim-Geocoding, Historie
                                               └─ Blobs: latest, history, geocache, runstate
 ```
@@ -24,6 +24,15 @@ Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Backgrou
   **Pass B** (strukturierte Konsolidierung von Lagebericht + GDELT + NINA) ist
   das Produkt und muss die Validierung in `lib/core.mjs` bestehen, sonst
   bleibt das vorige Lagebild stehen.
+- **Quellenpflicht pro Vorfall**: `quelleUrl` ist Pflichtfeld im Pass-B-Schema
+  und muss auf einen GDELT-Artikel dieses Laufs zeigen. `lib/core.mjs` prüft
+  die zitierte URL gegen den GDELT-Pool (Host ohne `www.`, Pfad ohne
+  Schrägstrich am Ende; Schema, Query und Fragment werden ignoriert) und
+  speichert die URL des Collectors. Vorfälle ohne solchen Beleg fallen heraus
+  und werden als `stats.unsourcedIncidents` ausgewiesen — Karte und
+  Vorfallsliste enthalten damit nur Nachprüfbares. Liefert GDELT gar nichts,
+  schlägt der Lauf ab und das vorige Lagebild bleibt stehen, statt ein
+  unbelegtes „keine Vorfälle" zu veröffentlichen.
 - Baseline-Regel serverseitig erzwungen: ohne Vorfälle der letzten 30 Tage
   wird der Score auf 35–45 geklemmt.
 - Geocoding: Modell-Koordinaten werden nur innerhalb Deutschlands akzeptiert,
