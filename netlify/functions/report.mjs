@@ -13,11 +13,22 @@ export default async () => {
     store.get("runstate", { type: "json" }),
   ]);
 
+  /* The full runstate is exposed on purpose: a failed run must be visible to
+     the page (and to whoever debugs it), otherwise a broken scan looks like a
+     scan that never ends. It contains only status metadata, never secrets. */
   return new Response(
     JSON.stringify({
       latest: latest || null,
       history: Array.isArray(history) ? history : [],
       running: runstate?.status === "running" ? { startedAt: runstate.startedAt } : null,
+      lastRun: runstate
+        ? {
+            status: runstate.status || null,
+            detail: runstate.detail || null,
+            startedAt: runstate.startedAt || null,
+            finishedAt: runstate.finishedAt || null,
+          }
+        : null,
     }),
     {
       status: 200,

@@ -397,6 +397,10 @@
             } else if (latest) {
                 el("status-dot").className = "h-2 w-2 rounded-full bg-emerald-500";
                 el("status-text").textContent = "Online";
+            } else if (payload.lastRun && payload.lastRun.status === "failed") {
+                el("status-dot").className = "h-2 w-2 rounded-full bg-red-500";
+                el("status-text").textContent = "Letzter Scan fehlgeschlagen";
+                notice("Der letzte Scan ist fehlgeschlagen: " + (payload.lastRun.detail || "unbekannter Fehler"), "error");
             } else {
                 el("status-dot").className = "h-2 w-2 rounded-full bg-slate-300";
                 el("status-text").textContent = "Noch kein Lagebild vorhanden";
@@ -489,7 +493,8 @@
         });
 
         async function pollForUpdate() {
-            const deadline = Date.now() + 5 * 60 * 1000;
+            const startedPolling = Date.now();
+            const deadline = startedPolling + 5 * 60 * 1000;
             while (Date.now() < deadline) {
                 await new Promise((r) => setTimeout(r, 8000));
                 try {
@@ -499,6 +504,14 @@
                         render(payload);
                         setScanning(false);
                         clearNotice();
+                        return;
+                    }
+                    /* A run that failed after we started polling ends the wait
+                       with the real reason instead of a silent spinner. */
+                    const lr = payload.lastRun;
+                    if (lr && lr.status === "failed" && lr.finishedAt && Date.parse(lr.finishedAt) >= startedPolling - 60000) {
+                        setScanning(false);
+                        notice("Der Scan ist fehlgeschlagen: " + (lr.detail || "unbekannter Fehler") + " — Details stehen in den Netlify-Function-Logs (scan-run).", "error");
                         return;
                     }
                 } catch { /* transient — keep polling */ }
