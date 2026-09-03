@@ -56,9 +56,10 @@ export default async (req) => {
   try {
     console.log(`scan-run: started (source: ${source})`);
 
-    const { articles, warnings, errors } = await collectAll();
+    const { articles, newsProvider, warnings, errors } = await collectAll();
     console.log(
-      `scan-run: collected ${articles.length} GDELT articles, ${warnings.length} NINA warnings` +
+      `scan-run: collected ${articles.length} articles via ${newsProvider}, ` +
+        `${warnings.length} NINA warnings` +
         (errors.length ? `, collector errors: ${errors.join("; ")}` : "")
     );
 
@@ -78,10 +79,23 @@ export default async (req) => {
       console.warn(`scan-run: grounded pass failed (${err.message}), continuing without it`);
     }
 
+    /* A run only aborts when every layer came up empty: with no headlines,
+       no official warnings and no grounded report there is nothing to reason
+       from, and overwriting the archive with a guess would be worse than
+       keeping yesterday's Lagebild. A single failed layer — GDELT throttling
+       the runtime, say — is not that case. */
+    if (!articles.length && !warnings.length && !reportText) {
+      throw new Error(
+        "no material: news providers, NINA and search grounding all failed" +
+          (errors.length ? ` (${errors.join("; ")})` : "")
+      );
+    }
+
     const { analysis: rawAnalysis, model } = await structuredAnalysis(apiKey, {
       reportText,
       articles,
       warnings,
+      newsProvider,
     });
     const analysis = normalizeAnalysis(rawAnalysis);
     console.log(
@@ -101,7 +115,8 @@ export default async (req) => {
       report: reportText,
       sources: groundedSources,
       stats: {
-        gdeltArticles: articles.length,
+        newsArticles: articles.length,
+        newsProvider,
         ninaWarnings: warnings.length,
         model,
         groundedModel,
