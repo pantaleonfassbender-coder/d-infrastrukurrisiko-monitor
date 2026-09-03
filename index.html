@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infrastruktur-Radar Deutschland (OSINT)</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' fill='%232563eb'/%3E%3C/svg%3E">
+
+    <!-- Tailwind CSS (Play-CDN-Build, self-hosted — die Seite ruft keine CDNs auf) -->
+    <script src="assets/vendor/tailwind/tailwind-3.4.16.js"></script>
+
+    <!-- Leaflet (self-hosted, see assets/vendor/leaflet/LICENSE.txt) -->
+    <link rel="stylesheet" href="assets/vendor/leaflet/leaflet.css">
+    <script src="assets/vendor/leaflet/leaflet.js"></script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        #map { height: 380px; border-radius: 0.5rem; z-index: 0; }
+        .leaflet-container { font: inherit; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans antialiased">
+
+    <div class="min-h-screen flex flex-col md:flex-row">
+
+        <!-- Sidebar -->
+        <aside class="w-full md:w-64 bg-white border-b md:border-r border-slate-200 flex flex-col shrink-0 z-20">
+            <div class="p-6 border-b border-slate-100">
+                <div class="flex items-center gap-2 text-blue-600 mb-1">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span class="font-black text-lg tracking-tighter uppercase">Infrastruktur</span>
+                </div>
+                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-8">Radar Deutschland</div>
+            </div>
+
+            <div class="p-4 space-y-4 flex-grow">
+                <div class="p-4 bg-slate-100 rounded-lg">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div id="status-dot" class="h-2 w-2 rounded-full bg-slate-300"></div>
+                        <span class="text-[10px] font-bold text-slate-500 uppercase">System Status</span>
+                    </div>
+                    <p id="status-text" class="text-xs font-medium text-slate-600">Lade Lagebild…</p>
+                    <p id="status-engine" class="text-[9px] text-slate-400 mt-1"></p>
+                </div>
+
+                <div class="p-4 bg-slate-100 rounded-lg">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Quellenbasis</div>
+                    <div class="space-y-1 text-[11px] text-slate-600">
+                        <div class="flex justify-between"><span>GDELT-Artikel</span><span id="stat-gdelt" class="font-bold">–</span></div>
+                        <div class="flex justify-between"><span>NINA-Warnungen</span><span id="stat-nina" class="font-bold">–</span></div>
+                        <div class="flex justify-between"><span>Belegte Quellen</span><span id="stat-sources" class="font-bold">–</span></div>
+                        <div class="flex justify-between"><span>Vorfälle (30 T.)</span><span id="stat-incidents" class="font-bold">–</span></div>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-slate-100 rounded-lg">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Methodik</div>
+                    <p class="text-[10px] text-slate-500 leading-relaxed">
+                        Täglicher Scan aus drei Schichten: GDELT-Nachrichtensuche, amtliche
+                        NINA-Warnmeldungen (BBK) und eine KI-Recherche mit Such-Grounding.
+                        Nur verifizierte Ereignisse der letzten 30 Tage erhöhen den Score;
+                        ohne neue Vorfälle gilt die Baseline von ~35 Punkten.
+                    </p>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-100">
+                <p class="text-[10px] text-slate-500 leading-tight">© Dr. Pantaleon Fassbender</p>
+                <p class="text-[10px] mt-1"><a href="impressum.html" class="text-blue-600 hover:underline">Impressum &amp; Datenschutz</a></p>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="flex-1 flex flex-col bg-slate-50 min-w-0">
+
+            <header class="px-6 md:px-8 py-6 bg-white border-b border-slate-200 flex flex-wrap gap-4 justify-between items-center shadow-sm">
+                <div>
+                    <h2 class="text-xl font-black uppercase text-slate-800 tracking-tight">Lagebild Infrastruktur-Sicherheit</h2>
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                        <span id="last-update">Noch kein Scan</span>
+                    </div>
+                </div>
+                <button id="scan-btn"
+                    class="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-[11px] font-black uppercase tracking-wide transition-all shadow-md bg-slate-900 hover:opacity-90 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                    <svg id="scan-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <span id="scan-label">Scan aktualisieren</span>
+                </button>
+            </header>
+
+            <div id="notice" class="hidden mx-6 md:mx-8 mt-6 p-4 rounded-xl text-sm font-medium"></div>
+
+            <div class="flex-1 p-6 md:p-8">
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 max-w-7xl mx-auto">
+
+                    <!-- Linke Spalte -->
+                    <div class="xl:col-span-7 space-y-6 min-w-0">
+
+                        <!-- Score + Sektoren -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                            <div class="flex flex-col md:flex-row items-center gap-8">
+                                <div class="shrink-0 text-center">
+                                    <svg id="gauge" width="180" height="110" viewBox="0 0 180 110"></svg>
+                                    <div class="-mt-8">
+                                        <span id="score-value" class="text-4xl font-black text-slate-300">--</span>
+                                        <div id="score-level" class="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Kein Lagebild</div>
+                                    </div>
+                                </div>
+                                <div class="flex-grow w-full">
+                                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Risiko nach Sektor</h3>
+                                    <div id="sectors" class="space-y-2"></div>
+                                </div>
+                            </div>
+                            <div class="mt-6 pt-4 border-t border-slate-100 grid grid-cols-3 gap-2">
+                                <div class="bg-slate-50 p-2 rounded border border-slate-100">
+                                    <div class="text-[10px] font-bold text-emerald-600">35–45 Pkt</div>
+                                    <div class="text-[10px] text-slate-400">Baseline (Latenz)</div>
+                                </div>
+                                <div class="bg-slate-50 p-2 rounded border border-slate-100">
+                                    <div class="text-[10px] font-bold text-amber-500">50–70 Pkt</div>
+                                    <div class="text-[10px] text-slate-400">Neue Warnhinweise</div>
+                                </div>
+                                <div class="bg-slate-50 p-2 rounded border border-slate-100">
+                                    <div class="text-[10px] font-bold text-red-600">75+ Pkt</div>
+                                    <div class="text-[10px] text-slate-400">Akuter Angriff</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Verlauf -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Score-Verlauf (90 Tage)</h3>
+                            <div id="chart-wrap" class="overflow-x-auto">
+                                <svg id="chart" width="100%" height="190" viewBox="0 0 640 190" preserveAspectRatio="none"></svg>
+                            </div>
+                            <p id="chart-empty" class="text-xs text-slate-400 text-center py-6 hidden">Noch keine Historie — sie füllt sich mit jedem täglichen Scan.</p>
+                        </div>
+
+                        <!-- Lagebericht -->
+                        <div class="bg-slate-900 rounded-xl border border-slate-800 p-8 shadow-xl">
+                            <div class="mb-6 pb-4 border-b border-white/10">
+                                <h3 class="font-bold text-white text-lg">Lagebericht (30 Tage)</h3>
+                                <p class="text-xs text-slate-400 mt-1">KI-Synthese aus GDELT, NINA und Such-Grounding.</p>
+                            </div>
+                            <div id="assessment" class="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap mb-6 italic">Bitte Scan starten oder auf den täglichen Lauf warten.</div>
+                            <details id="report-details" class="hidden">
+                                <summary class="text-xs text-blue-400 cursor-pointer uppercase font-bold tracking-widest">Ausführlicher Recherche-Bericht</summary>
+                                <div id="report-text" class="text-slate-400 text-xs leading-relaxed whitespace-pre-wrap mt-4"></div>
+                            </details>
+                        </div>
+                    </div>
+
+                    <!-- Rechte Spalte -->
+                    <div class="xl:col-span-5 space-y-6 min-w-0">
+
+                        <!-- Karte -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest">Vorfallskarte</h3>
+                                <div class="flex items-center gap-3 text-[9px] text-slate-400">
+                                    <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-500 inline-block"></span>gering</span>
+                                    <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-orange-500 inline-block"></span>mittel</span>
+                                    <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-red-600 inline-block"></span>hoch</span>
+                                </div>
+                            </div>
+                            <div id="map"></div>
+                        </div>
+
+                        <!-- Vorfälle -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                            <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Vorfälle (30 Tage)</h3>
+                            <div id="incidents" class="space-y-3 max-h-[420px] overflow-y-auto custom-scrollbar pr-2">
+                                <div class="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Warte auf Scan…</div>
+                            </div>
+                        </div>
+
+                        <!-- Quellen -->
+                        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                            <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Quellen-Feed</h3>
+                            <div id="sources" class="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-2">
+                                <div class="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Warte auf Scan…</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        "use strict";
+
+        const SECTOR_LABELS = { bahn: "Bahn", energie: "Energie", drohnen: "Drohnen", telekom: "Telekom", industrie: "Industrie", cyber: "Cyber", sonstige: "Sonstige" };
+
+        const DEMO = new URLSearchParams(location.search).has("demo");
+        const DEMO_DATA = {
+            latest: {
+                generatedAt: new Date().toISOString(),
+                date: new Date().toISOString().slice(0, 10),
+                score: 58, level: "ERHÖHT",
+                assessment: "Demo-Modus: In den letzten 30 Tagen wurden mehrere Drohnensichtungen über Industrieanlagen sowie ein Brandanschlag auf eine Bahnstrecke gemeldet. Die Lage ist erhöht, aber nicht kritisch.",
+                report: "Dies ist der ausführliche Demo-Recherchebericht.\n\nEr dient nur der lokalen Layout-Prüfung.",
+                sectors: [
+                    { key: "bahn", label: "Bahn", score: 72 }, { key: "energie", label: "Energie", score: 55 },
+                    { key: "drohnen", label: "Drohnen", score: 65 }, { key: "telekom", label: "Telekom", score: 38 },
+                    { key: "industrie", label: "Industrie", score: 44 }, { key: "cyber", label: "Cyber", score: 51 }
+                ],
+                incidents: [
+                    { date: "2026-08-28", ort: "Hamburg", lat: 53.55, lon: 9.99, sektor: "bahn", schweregrad: 4, titel: "Brandanschlag auf Kabelschacht", beschreibung: "Demo-Vorfall zur Layout-Prüfung.", quelleUrl: "https://example.org" },
+                    { date: "2026-08-25", ort: "München", lat: 48.14, lon: 11.58, sektor: "drohnen", schweregrad: 2, titel: "Drohnensichtung über Werksgelände", beschreibung: "Demo-Vorfall.", quelleUrl: "" },
+                    { date: "2026-08-20", ort: "Köln", lat: 50.94, lon: 6.96, sektor: "cyber", schweregrad: 3, titel: "DDoS auf Stadtwerke", beschreibung: "Demo-Vorfall.", quelleUrl: "https://example.org" }
+                ],
+                sources: [
+                    { uri: "https://example.org/a", title: "Beispielquelle A", origin: "grounding" },
+                    { uri: "https://example.org/b", title: "Beispielquelle B", origin: "grounding" }
+                ],
+                stats: { gdeltArticles: 42, ninaWarnings: 7, model: "demo", groundedModel: "demo", collectorErrors: [] }
+            },
+            history: Array.from({ length: 60 }, (_, i) => {
+                const d = new Date(Date.now() - (59 - i) * 86400000);
+                return { date: d.toISOString().slice(0, 10), score: Math.round(40 + 18 * Math.abs(Math.sin(i / 9)) + (i > 45 ? 8 : 0)), incidentCount: i % 7 === 0 ? 1 : 0 };
+            }),
+            running: null
+        };
+
+        const el = (id) => document.getElementById(id);
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+        function scoreColor(score) {
+            if (score > 70) return "#dc2626";
+            if (score > 45) return "#f59e0b";
+            return "#059669";
+        }
+        function sevColor(sev) {
+            if (sev >= 4) return "#dc2626";
+            if (sev === 3) return "#f97316";
+            return "#f59e0b";
+        }
+        function fmtDate(iso) {
+            /* Date-only strings are formatted verbatim: parsing them would
+               treat them as UTC midnight and shift the day in western
+               timezones. */
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+            if (m) return m[3] + "." + m[2] + "." + m[1];
+            const t = Date.parse(iso);
+            return Number.isFinite(t) ? new Date(t).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : iso;
+        }
+        function fmtDateTime(iso) {
+            const t = Date.parse(iso);
+            return Number.isFinite(t) ? new Date(t).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) + " Uhr" : iso;
+        }
+
+        // ---------- Karte ----------
+        let map = null, markerLayer = null;
+        function ensureMap() {
+            if (map || typeof L === "undefined") return;
+            map = L.map("map", { scrollWheelZoom: false }).setView([51.163, 10.447], 5);
+            L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 18,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende'
+            }).addTo(map);
+            markerLayer = L.layerGroup().addTo(map);
+        }
+        function renderMap(incidents) {
+            ensureMap();
+            markerLayer.clearLayers();
+            const located = incidents.filter((i) => Number.isFinite(i.lat) && Number.isFinite(i.lon));
+            for (const inc of located) {
+                const m = L.circleMarker([inc.lat, inc.lon], {
+                    radius: 6 + inc.schweregrad * 1.5,
+                    color: sevColor(inc.schweregrad),
+                    fillColor: sevColor(inc.schweregrad),
+                    fillOpacity: 0.55, weight: 2
+                });
+                m.bindPopup(
+                    '<div style="min-width:180px">' +
+                    '<div style="font-weight:700">' + esc(inc.titel) + "</div>" +
+                    '<div style="color:#64748b;font-size:11px;margin-top:2px">' + esc(inc.ort) + " · " + fmtDate(inc.date) + " · " + esc(SECTOR_LABELS[inc.sektor] || inc.sektor) + "</div>" +
+                    (inc.beschreibung ? '<div style="font-size:12px;margin-top:6px">' + esc(inc.beschreibung) + "</div>" : "") +
+                    (inc.quelleUrl ? '<div style="margin-top:6px"><a href="' + esc(inc.quelleUrl) + '" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-size:11px">Quelle öffnen</a></div>' : "") +
+                    "</div>"
+                );
+                markerLayer.addLayer(m);
+            }
+            if (located.length) {
+                map.fitBounds(L.latLngBounds(located.map((i) => [i.lat, i.lon])).pad(0.35), { maxZoom: 8 });
+            } else {
+                map.setView([51.163, 10.447], 5);
+            }
+        }
+
+        // ---------- Gauge ----------
+        function renderGauge(score) {
+            const svg = el("gauge");
+            const color = scoreColor(score);
+            const cx = 90, cy = 100, r = 75;
+            const angle = Math.PI * (1 - score / 100);
+            const x = cx + r * Math.cos(angle), y = cy - r * Math.sin(angle);
+            /* The value arc spans at most the semicircle (180°), so the
+               large-arc flag is always 0. */
+            svg.innerHTML =
+                '<path d="M ' + (cx - r) + " " + cy + " A " + r + " " + r + ' 0 0 1 ' + (cx + r) + " " + cy + '" fill="none" stroke="#e2e8f0" stroke-width="14" stroke-linecap="round"/>' +
+                (score > 0
+                    ? '<path d="M ' + (cx - r) + " " + cy + " A " + r + " " + r + ' 0 0 1 ' + x.toFixed(1) + " " + y.toFixed(1) + '" fill="none" stroke="' + color + '" stroke-width="14" stroke-linecap="round"/>'
+                    : "");
+            el("score-value").textContent = score;
+            el("score-value").style.color = color;
+            el("score-value").classList.remove("text-slate-300");
+        }
+
+        // ---------- Sektoren ----------
+        function renderSectors(sectors) {
+            el("sectors").innerHTML = (sectors || []).map((s) =>
+                '<div class="flex items-center gap-3">' +
+                '<span class="w-20 text-[10px] font-bold uppercase text-slate-500 shrink-0">' + esc(s.label || SECTOR_LABELS[s.key] || s.key) + "</span>" +
+                '<div class="flex-grow bg-slate-100 rounded-full h-2.5 overflow-hidden">' +
+                '<div class="h-2.5 rounded-full transition-all" style="width:' + Math.max(2, s.score) + "%;background:" + scoreColor(s.score) + '"></div></div>' +
+                '<span class="w-8 text-right text-[11px] font-bold" style="color:' + scoreColor(s.score) + '">' + s.score + "</span></div>"
+            ).join("");
+        }
+
+        // ---------- Verlauf ----------
+        function renderChart(history) {
+            const svg = el("chart");
+            const empty = el("chart-empty");
+            const data = (history || []).slice(-90);
+            if (data.length < 2) {
+                svg.style.display = "none";
+                empty.classList.remove("hidden");
+                return;
+            }
+            svg.style.display = "";
+            empty.classList.add("hidden");
+            const W = 640, H = 190, padL = 30, padR = 10, padT = 12, padB = 24;
+            const x = (i) => padL + (i / (data.length - 1)) * (W - padL - padR);
+            const y = (v) => padT + (1 - v / 100) * (H - padT - padB);
+            let out = "";
+            for (const g of [0, 25, 50, 75, 100]) {
+                out += '<line x1="' + padL + '" y1="' + y(g) + '" x2="' + (W - padR) + '" y2="' + y(g) + '" stroke="#f1f5f9" stroke-width="1"/>' +
+                    '<text x="' + (padL - 6) + '" y="' + (y(g) + 3) + '" text-anchor="end" font-size="9" fill="#94a3b8">' + g + "</text>";
+            }
+            out += '<line x1="' + padL + '" y1="' + y(45) + '" x2="' + (W - padR) + '" y2="' + y(45) + '" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>';
+            out += '<line x1="' + padL + '" y1="' + y(70) + '" x2="' + (W - padR) + '" y2="' + y(70) + '" stroke="#dc2626" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>';
+            const pts = data.map((d, i) => x(i).toFixed(1) + "," + y(d.score).toFixed(1)).join(" ");
+            out += '<polyline points="' + pts + '" fill="none" stroke="#2563eb" stroke-width="2"/>';
+            data.forEach((d, i) => {
+                out += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(d.score).toFixed(1) + '" r="3" fill="#2563eb" opacity="0.85"><title>' + esc(fmtDate(d.date)) + ": " + d.score + "</title></circle>";
+            });
+            out += '<text x="' + padL + '" y="' + (H - 6) + '" font-size="9" fill="#94a3b8">' + esc(fmtDate(data[0].date)) + "</text>";
+            out += '<text x="' + (W - padR) + '" y="' + (H - 6) + '" text-anchor="end" font-size="9" fill="#94a3b8">' + esc(fmtDate(data[data.length - 1].date)) + "</text>";
+            svg.innerHTML = out;
+        }
+
+        // ---------- Listen ----------
+        function renderIncidents(incidents) {
+            const box = el("incidents");
+            if (!incidents || !incidents.length) {
+                box.innerHTML = '<div class="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Keine verifizierten Vorfälle in den letzten 30 Tagen — Score auf Baseline.</div>';
+                return;
+            }
+            box.innerHTML = incidents.map((inc) =>
+                '<div class="p-3 rounded-lg border border-slate-100 bg-slate-50">' +
+                '<div class="flex items-start justify-between gap-2">' +
+                '<p class="text-xs font-bold text-slate-800 leading-snug">' + esc(inc.titel) + "</p>" +
+                '<span class="shrink-0 text-[9px] font-black text-white px-1.5 py-0.5 rounded" style="background:' + sevColor(inc.schweregrad) + '">S' + inc.schweregrad + "</span></div>" +
+                (inc.beschreibung ? '<p class="text-[11px] text-slate-500 mt-1 leading-snug">' + esc(inc.beschreibung) + "</p>" : "") +
+                '<div class="flex flex-wrap items-center gap-2 mt-2 text-[9px] text-slate-400">' +
+                '<span class="bg-white px-1.5 py-0.5 rounded border border-slate-200">' + esc(inc.ort) + "</span>" +
+                '<span class="bg-white px-1.5 py-0.5 rounded border border-slate-200">' + esc(fmtDate(inc.date)) + "</span>" +
+                '<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">' + esc(SECTOR_LABELS[inc.sektor] || inc.sektor) + "</span>" +
+                (inc.quelleUrl ? '<a class="text-blue-500 hover:underline" href="' + esc(inc.quelleUrl) + '" target="_blank" rel="noopener noreferrer">Quelle</a>' : "") +
+                "</div></div>"
+            ).join("");
+        }
+
+        function renderSources(sources) {
+            const box = el("sources");
+            if (!sources || !sources.length) {
+                box.innerHTML = '<div class="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Keine Grounding-Quellen im letzten Scan.</div>';
+                return;
+            }
+            box.innerHTML = sources.map((s) => {
+                let host = "";
+                try { host = new URL(s.uri).hostname.replace("www.", ""); } catch { host = ""; }
+                return '<a href="' + esc(s.uri) + '" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-slate-100 hover:border-blue-400 bg-slate-50 group">' +
+                    '<span class="text-[11px] font-medium text-slate-700 group-hover:text-blue-600 truncate">' + esc(s.title) + "</span>" +
+                    '<span class="text-[9px] text-slate-400 shrink-0">' + esc(host) + "</span></a>";
+            }).join("");
+        }
+
+        // ---------- Gesamt-Render ----------
+        function render(payload) {
+            const { latest, history, running } = payload;
+            if (running) {
+                el("status-dot").className = "h-2 w-2 rounded-full bg-amber-500 animate-pulse";
+                el("status-text").textContent = "Scan läuft seit " + fmtDateTime(running.startedAt);
+            } else if (latest) {
+                el("status-dot").className = "h-2 w-2 rounded-full bg-emerald-500";
+                el("status-text").textContent = "Online";
+            } else {
+                el("status-dot").className = "h-2 w-2 rounded-full bg-slate-300";
+                el("status-text").textContent = "Noch kein Lagebild vorhanden";
+            }
+            renderChart(history);
+            if (!latest) { ensureMap(); return; }
+
+            el("last-update").textContent = "Stand: " + fmtDateTime(latest.generatedAt);
+            el("status-engine").textContent = latest.stats?.model ? "Engine: " + latest.stats.model : "";
+            el("stat-gdelt").textContent = latest.stats?.gdeltArticles ?? "–";
+            el("stat-nina").textContent = latest.stats?.ninaWarnings ?? "–";
+            el("stat-sources").textContent = (latest.sources || []).length;
+            el("stat-incidents").textContent = (latest.incidents || []).length;
+
+            renderGauge(latest.score);
+            const lvl = el("score-level");
+            lvl.textContent = latest.level;
+            lvl.style.color = scoreColor(latest.score);
+            renderSectors(latest.sectors);
+            renderMap(latest.incidents || []);
+            renderIncidents(latest.incidents || []);
+            renderSources(latest.sources || []);
+
+            el("assessment").classList.remove("italic");
+            el("assessment").textContent = latest.assessment;
+            if (latest.report) {
+                el("report-details").classList.remove("hidden");
+                el("report-text").textContent = latest.report;
+            }
+        }
+
+        function notice(msg, kind) {
+            const n = el("notice");
+            n.className = "mx-6 md:mx-8 mt-6 p-4 rounded-xl text-sm font-medium " +
+                (kind === "error" ? "bg-red-100 border border-red-200 text-red-700" : "bg-blue-50 border border-blue-200 text-blue-700");
+            n.textContent = msg;
+            n.classList.remove("hidden");
+        }
+        function clearNotice() { el("notice").classList.add("hidden"); }
+
+        async function loadReport() {
+            if (DEMO) return DEMO_DATA;
+            const res = await fetch("/api/report", { cache: "no-store" });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.json();
+        }
+
+        let lastGeneratedAt = null;
+        async function init() {
+            try {
+                const payload = await loadReport();
+                lastGeneratedAt = payload.latest?.generatedAt || null;
+                render(payload);
+            } catch (err) {
+                ensureMap();
+                el("status-dot").className = "h-2 w-2 rounded-full bg-red-500";
+                el("status-text").textContent = "Lagebild nicht erreichbar";
+                notice("Das Lagebild konnte nicht geladen werden (" + err.message + "). Läuft die Seite auf Netlify mit aktiven Functions?", "error");
+            }
+        }
+
+        // ---------- Manueller Scan ----------
+        const scanBtn = el("scan-btn");
+        function setScanning(on, label) {
+            scanBtn.disabled = on;
+            el("scan-label").textContent = label || (on ? "Scan läuft…" : "Scan aktualisieren");
+            el("scan-icon").classList.toggle("animate-spin", on);
+        }
+
+        scanBtn.addEventListener("click", async () => {
+            clearNotice();
+            if (DEMO) { notice("Demo-Modus: Der Scan-Button ist deaktiviert.", "info"); return; }
+            setScanning(true, "Wird gestartet…");
+            try {
+                const res = await fetch("/api/scan/trigger", { method: "POST" });
+                const body = await res.json().catch(() => ({}));
+                if (res.status === 429) {
+                    setScanning(false);
+                    notice("Ein Scan lief bereits vor kurzem. Bitte in " + Math.ceil((body.retryAfterSec || 600) / 60) + " Minuten erneut versuchen.", "info");
+                    return;
+                }
+                if (res.status !== 202) throw new Error(body.error || "HTTP " + res.status);
+                setScanning(true, "Scan läuft…");
+                notice("Scan gestartet. Das Lagebild aktualisiert sich automatisch, sobald der Lauf abgeschlossen ist (typisch 1–3 Minuten).", "info");
+                await pollForUpdate();
+            } catch (err) {
+                setScanning(false);
+                notice("Scan konnte nicht gestartet werden: " + err.message, "error");
+            }
+        });
+
+        async function pollForUpdate() {
+            const deadline = Date.now() + 5 * 60 * 1000;
+            while (Date.now() < deadline) {
+                await new Promise((r) => setTimeout(r, 8000));
+                try {
+                    const payload = await loadReport();
+                    if (payload.latest && payload.latest.generatedAt !== lastGeneratedAt) {
+                        lastGeneratedAt = payload.latest.generatedAt;
+                        render(payload);
+                        setScanning(false);
+                        clearNotice();
+                        return;
+                    }
+                } catch { /* transient — keep polling */ }
+            }
+            setScanning(false);
+            notice("Der Scan meldet sich nicht zurück. Bitte Seite später neu laden.", "error");
+        }
+
+        init();
+    </script>
+</body>
+</html>

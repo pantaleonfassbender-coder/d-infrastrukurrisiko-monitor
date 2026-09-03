@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Impressum &amp; Datenschutz — Infrastruktur-Radar Deutschland</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' fill='%232563eb'/%3E%3C/svg%3E">
+<!-- Bewusst eigenständig ohne Frameworks und ohne externe Abrufe, damit diese
+     Seite auch trägt, wenn die Anwendung selbst nicht startet. -->
+<style>
+  body { margin: 0; background: #f8fafc; color: #0f172a; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.65; }
+  main { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1 { font-size: 1.6rem; letter-spacing: -0.02em; }
+  h2 { font-size: 1.05rem; margin-top: 2.2rem; text-transform: uppercase; letter-spacing: 0.06em; color: #334155; }
+  p, li { font-size: 0.95rem; color: #1e293b; }
+  a { color: #2563eb; }
+  .top { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1.25rem 1.5rem; margin-top: 1rem; }
+  footer { margin-top: 3rem; font-size: 0.8rem; color: #64748b; }
+</style>
+</head>
+<body>
+<main>
+  <p class="top"><a href="index.html">← Zurück zum Infrastruktur-Radar</a></p>
+  <h1>Impressum &amp; Datenschutzerklärung</h1>
+
+  <h2>Betreiber</h2>
+  <div class="card">
+    <p>Dr. Pantaleon Fassbender<br>
+    16751 NE 5th Street<br>
+    Williston, FL 32696<br>
+    Vereinigte Staaten von Amerika</p>
+    <p>E-Mail: <a href="mailto:pantaleonfassbender@gmail.com">pantaleonfassbender@gmail.com</a></p>
+    <p>Diese Seite ist ein persönliches Forschungsprojekt, betrieben und gehostet in den
+    Vereinigten Staaten von einer Privatperson — nicht im Auftrag einer Institution, eines
+    Arbeitgebers oder Verlags. Sie trägt weder Werbung noch Sponsoring. Verantwortlich für den
+    Inhalt: Dr. Pantaleon Fassbender, Anschrift wie oben.</p>
+    <p>Da die Seite aus dem Europäischen Wirtschaftsraum abrufbar ist und sich mit ihren
+    deutschsprachigen Inhalten erkennbar auch an Leserinnen und Leser dort richtet, ist diese
+    Erklärung so gefasst, dass sie der Datenschutz-Grundverordnung genügt (räumlicher
+    Anwendungsbereich: Art. 3 Abs. 2 DSGVO). Soweit die DSGVO anwendbar ist, ist der Betreiber
+    Verantwortlicher im Sinne von Art. 4 Nr. 7 DSGVO.</p>
+  </div>
+
+  <h2>Was diese Seite ist — und was nicht</h2>
+  <div class="card">
+    <p>Der Infrastruktur-Radar zeigt ein täglich erzeugtes Lagebild zur Sicherheit kritischer
+    Infrastruktur in Deutschland: einen Risiko-Index, eine Vorfallskarte und einen Bericht mit
+    Quellenangaben. Der Index ist eine <strong>KI-gestützte Heuristik aus offenen Quellen</strong>
+    — kein amtliches Lagebild, keine Warn-App und keine Grundlage für Sicherheits-, Anlage- oder
+    sonstige Entscheidungen. Einzelne Einträge können falsch datiert, falsch verortet oder falsch
+    gewichtet sein; maßgeblich sind stets die verlinkten Originalquellen.</p>
+  </div>
+
+  <h2>Keine Eingaben, keine Konten, keine Messung</h2>
+  <div class="card">
+    <p>Die Seite hat <strong>kein Eingabefeld</strong>: Nichts, was Sie tun, wird an einen
+    KI-Anbieter übermittelt. Das Lagebild entsteht serverseitig nach Zeitplan; der Knopf
+    „Scan aktualisieren" sendet lediglich eine inhaltsleere Anfrage, einen Lauf vorzuziehen, und
+    wird global — nicht pro Besucher — auf einen Lauf je zehn Minuten begrenzt. Es gibt keine
+    Konten, keine Formulare, keine Cookies, keinen Browser-Speicher und keine Analyse-, Werbe-
+    oder Reichweitendienste. Skripte, Schriften und die Kartenbibliothek (Leaflet) liefert die
+    Seite selbst aus.</p>
+    <p>Eine Ausnahme gibt es: Die <strong>Kartenkacheln</strong> lädt Ihr Browser direkt von der
+    OpenStreetMap Foundation (tile.openstreetmap.org). Dabei erhält deren Infrastruktur — wie bei
+    jedem Bildabruf im Web — Ihre IP-Adresse und die angefragten Kartenausschnitte. Es gelten die
+    <a href="https://wiki.osmfoundation.org/wiki/Privacy_Policy" rel="noopener">Datenschutzhinweise
+    der OSMF</a>. Weitere Dritt-Abrufe gibt es nicht.</p>
+  </div>
+
+  <h2>Wie das Lagebild entsteht</h2>
+  <div class="card">
+    <p>Ein serverseitiger Lauf (Netlify Functions) sammelt deutschsprachige Nachrichten über die
+    GDELT-DOC-API und amtliche Warnmeldungen der NINA-Schnittstelle des BBK (warnung.bund.de),
+    lässt Google Gemini mit Such-Grounding recherchieren und konsolidiert alles zu Score,
+    Sektorwerten und Vorfallsliste. Ortsnamen aus den Vorfällen werden über Nominatim
+    (OpenStreetMap) in Koordinaten aufgelöst. <strong>An keiner dieser Stellen fließen
+    Besucherdaten:</strong> Google, GDELT, das BBK und Nominatim sehen nur die Anfragen des
+    Servers, nie Ihren Browser.</p>
+    <p>Gespeichert werden ausschließlich die Ergebnisse: das aktuelle Lagebild, die
+    Score-Historie und ein Cache aufgelöster Ortsnamen (Netlify Blobs). Keiner dieser Datensätze
+    enthält personenbezogene Daten von Besucherinnen und Besuchern — auch keine gekürzten oder
+    gehashten IP-Adressen.</p>
+  </div>
+
+  <h2>Server-Logs</h2>
+  <div class="card">
+    <p>Gehostet wird die Seite bei Netlify. Wie jeder Webhost protokolliert Netlifys
+    Infrastruktur die ausgelieferten Anfragen — typischerweise IP-Adresse, Zeitstempel,
+    angefragte URL, HTTP-Status, übertragene Bytes, User-Agent und Referrer. Das ist für den
+    Betrieb technisch unvermeidlich und die einzige serverseitige Erhebung; der Betreiber wertet
+    sie nicht aus. Soweit die DSGVO anwendbar ist, ist die Rechtsgrundlage Art. 6 Abs. 1 lit. f
+    DSGVO — das berechtigte Interesse am Betrieb einer funktionsfähigen, sicheren Website. Die
+    Speicherdauer richtet sich nach Netlifys Fristen. Betrieb und Hosting erfolgen in den
+    Vereinigten Staaten; für Leserinnen und Leser im EWR bedeutet das eine Verarbeitung der
+    Anfragedaten außerhalb des EWR.</p>
+  </div>
+
+  <h2>Ihre Rechte</h2>
+  <div class="card">
+    <p>Soweit die DSGVO anwendbar ist, bestehen die Rechte auf Auskunft, Berichtigung, Löschung,
+    Einschränkung, Widerspruch und Datenübertragbarkeit (Art. 15–21 DSGVO) sowie das
+    Beschwerderecht bei einer Aufsichtsbehörde (Art. 77 DSGVO). Da diese Seite selbst keine
+    personenbezogenen Daten speichert, betreffen solche Anliegen in der Regel Netlifys Logs oder
+    die Kachelabrufe bei der OSMF; der Betreiber unterstützt dabei. Kontakt: Anschrift oben.</p>
+  </div>
+
+  <h2>Rechte an den Inhalten</h2>
+  <div class="card">
+    <p>Der Code dieser Seite steht unter der MIT-Lizenz (Datei LICENSE im Repositorium). Die
+    verlinkten Nachrichten- und Warnquellen gehören ihren jeweiligen Anbietern. Kartenmaterial:
+    © <a href="https://www.openstreetmap.org/copyright" rel="noopener">OpenStreetMap</a>-Mitwirkende
+    (ODbL); Leaflet unter BSD-2-Clause (Lizenztext unter assets/vendor/leaflet/).</p>
+  </div>
+
+  <footer>Stand: 3. September 2026 · <a href="index.html">Zurück zum Infrastruktur-Radar</a></footer>
+</main>
+</body>
+</html>

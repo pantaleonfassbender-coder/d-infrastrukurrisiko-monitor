@@ -1,0 +1,11 @@
+# The static page is published from the repository root; the Lagebild and the
+# score history come from Netlify Functions backed by Netlify Blobs.
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
