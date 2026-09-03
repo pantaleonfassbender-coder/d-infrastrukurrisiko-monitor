@@ -36,11 +36,20 @@ Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Backgrou
    werden aus `netlify/functions` erkannt, Blobs brauchen keine Einrichtung).
 2. Environment-Variablen setzen:
    - `GEMINI_API_KEY` (erforderlich) — Google-AI-Studio-Key, nur serverseitig.
+     Scope „Functions" muss gesetzt sein. **Wichtig:** Eine geänderte
+     Environment-Variable erreicht die Functions erst mit dem nächsten
+     Deploy — ohne Redeploy läuft der Scan weiter mit dem alten Wert und
+     endet in „API key not valid".
+     Ist kein eigener Key gesetzt, nutzt der Scan automatisch das Netlify AI
+     Gateway (`NETLIFY_AI_GATEWAY_KEY` + `GOOGLE_GEMINI_BASE_URL`, von
+     Netlify injiziert, Abrechnung über Netlify-Credits).
    - `SCAN_TOKEN` (empfohlen) — beliebiger zufälliger String; schützt
      `/api/scan/run` vor direkten Fremdaufrufen. `scan-schedule` und
      `scan-trigger` reichen ihn automatisch weiter.
 3. Deployen. Der erste Lauf kommt um 05:30 UTC — oder sofort über den Button
-   „Scan aktualisieren" auf der Seite.
+   „Scan aktualisieren" auf der Seite. Ein fehlgeschlagener Lauf bleibt als
+   roter Hinweis stehen, bis ein neuer Scan durchläuft; der Status samt Grund
+   steht in `/api/report` unter `lastRun`.
 
 ## Lokal
 
@@ -51,7 +60,7 @@ Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Backgrou
 
 ## Quellen
 
-- [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) — deutschsprachige Nachrichten, letzte 30 Tage (frei, ohne Key).
+- [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) — deutschsprachige Nachrichten, letzte 30 Tage (frei, ohne Key). Antwortet zeitweise erst nach Minuten oder mit 429; der Collector wartet bis zu 60 s und versucht es dreimal, fällt danach aber weich aus (Lagebild dann ohne GDELT-Schicht).
 - [NINA-API des BBK](https://nina.api.bund.dev/) — MoWaS, Katwarn, Biwapp, Polizei (`warnung.bund.de/api31`).
 - Google-Search-Grounding über die Gemini API (`gemini-2.5-flash`, Fallback `gemini-2.5-pro`).
 - [Nominatim](https://nominatim.org/release-docs/latest/api/Search/) — Geocoding der Vorfallsorte.

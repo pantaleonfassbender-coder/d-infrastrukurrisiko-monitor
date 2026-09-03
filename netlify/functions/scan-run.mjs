@@ -18,7 +18,7 @@
 
 import { getStore } from "@netlify/blobs";
 import { collectAll } from "../../lib/sources.mjs";
-import { groundedReport, structuredAnalysis } from "../../lib/gemini.mjs";
+import { groundedReport, structuredAnalysis, resolveGemini } from "../../lib/gemini.mjs";
 import { normalizeAnalysis, geocodeIncidents, updateHistory } from "../../lib/core.mjs";
 
 const MIN_INTERVAL_MS = 10 * 60 * 1000;
@@ -47,14 +47,20 @@ export default async (req) => {
   const startedAtIso = new Date().toISOString();
   await store.setJSON("runstate", { startedAt: startedAtIso, source, status: "running" });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    await failRun(store, "GEMINI_API_KEY is not configured");
+  /* Key and endpoint together: a key from Netlify AI Gateway is only valid
+     against the gateway URL, so resolving them apart is what produces the
+     "API key not valid" dead end. */
+  const gemini = resolveGemini(process.env);
+  if (!gemini) {
+    await failRun(
+      store,
+      "Kein Gemini-Zugang konfiguriert: GEMINI_API_KEY in den Netlify-Umgebungsvariablen setzen (Scope: Functions) und neu deployen."
+    );
     return;
   }
 
   try {
-    console.log(`scan-run: started (source: ${source})`);
+    console.log(`scan-run: started (source: ${source}, gemini via ${gemini.origin})`);
 
     const { articles, warnings, errors } = await collectAll();
     console.log(
@@ -68,7 +74,7 @@ export default async (req) => {
     let groundedSources = [];
     let groundedModel = "";
     try {
-      const grounded = await groundedReport(apiKey);
+      const grounded = await groundedReport(gemini);
       reportText = grounded.text;
       groundedSources = grounded.sources;
       groundedModel = grounded.model;
@@ -78,7 +84,7 @@ export default async (req) => {
       console.warn(`scan-run: grounded pass failed (${err.message}), continuing without it`);
     }
 
-    const { analysis: rawAnalysis, model } = await structuredAnalysis(apiKey, {
+    const { analysis: rawAnalysis, model } = await structuredAnalysis(gemini, {
       reportText,
       articles,
       warnings,

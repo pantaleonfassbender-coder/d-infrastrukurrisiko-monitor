@@ -2,6 +2,7 @@
 
 import assert from "node:assert/strict";
 import { normalizeAnalysis, updateHistory, riskLevel } from "../lib/core.mjs";
+import { resolveGemini } from "../lib/gemini.mjs";
 
 const today = new Date().toISOString().slice(0, 10);
 const recent = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10);
@@ -102,5 +103,32 @@ assert.equal(riskLevel(80), "KRITISCH");
 assert.equal(riskLevel(60), "ERHÖHT");
 assert.equal(riskLevel(38), "LATENT");
 assert.equal(riskLevel(10), "RUHIG");
+
+// --- resolveGemini: key and endpoint always belong together ---
+{
+  const gateway = "https://example.netlify.app/.netlify/ai/google/v1beta";
+
+  const own = resolveGemini({ GEMINI_API_KEY: " AIzaOwnKey " });
+  assert.equal(own.apiKey, "AIzaOwnKey", "the key is trimmed");
+  assert.equal(own.origin, "GEMINI_API_KEY");
+  assert.match(own.baseUrl, /generativelanguage\.googleapis\.com/, "own key talks to Google directly");
+
+  const viaGateway = resolveGemini({
+    NETLIFY_AI_GATEWAY_KEY: "gw-key",
+    GOOGLE_GEMINI_BASE_URL: gateway + "/",
+  });
+  assert.equal(viaGateway.apiKey, "gw-key");
+  assert.equal(viaGateway.origin, "ai-gateway");
+  assert.equal(viaGateway.baseUrl, gateway, "trailing slash is normalised away");
+
+  const overridden = resolveGemini({ GEMINI_API_KEY: "own", GOOGLE_GEMINI_BASE_URL: gateway });
+  assert.equal(overridden.baseUrl, gateway, "an explicit base URL wins over the default");
+
+  // A gateway key without its base URL is unusable — that pairing is what
+  // produced "API key not valid" against Google's own endpoint.
+  assert.equal(resolveGemini({ NETLIFY_AI_GATEWAY_KEY: "gw-key" }), null);
+  assert.equal(resolveGemini({ GEMINI_API_KEY: "   " }), null, "a blank key counts as unset");
+  assert.equal(resolveGemini({}), null);
+}
 
 console.log("core.test.mjs: all assertions passed");
