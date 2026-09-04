@@ -5,7 +5,7 @@
   "type": "module",
   "description": "OSINT-Lagebild zur Infrastruktur-Sicherheit in Deutschland: statische Seite plus täglicher Scan (GDELT, NINA, Gemini) über Netlify Functions.",
   "scripts": {
-    "test": "node tests/core.test.mjs"
+    "test": "node tests/core.test.mjs && node tests/sources.test.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^8.1.0"

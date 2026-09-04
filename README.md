@@ -44,7 +44,7 @@ Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Backgrou
 
 ## Lokal
 
-- `node tests/core.test.mjs` — Offline-Tests der Validierungsschicht.
+- `npm test` — Offline-Tests der Validierungs- und Collector-Schicht.
 - `python -m http.server 8123` und `http://localhost:8123/index.html?demo=1`
   — Layout-Prüfung mit eingebetteten Demo-Daten, ohne Functions.
 - `netlify dev` (mit gesetzten Env-Variablen) für den vollen Stack.
@@ -52,6 +52,13 @@ Cron (05:30 UTC) ── scan-schedule.mjs ──► POST /api/scan/run (Backgrou
 ## Quellen
 
 - [GDELT DOC 2.0](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) — deutschsprachige Nachrichten, letzte 30 Tage (frei, ohne Key).
+  Drei Eigenheiten der API, die `lib/sources.mjs` abfedert: `sourcelang:`
+  erwartet den Sprachnamen (`german`, **nicht** `ger` — sonst antwortet GDELT
+  mit HTTP 200 und dem Klartext „Invalid/Unsupported Language."), die Query
+  darf höchstens 250 Zeichen lang sein, und mehr als eine Anfrage pro fünf
+  Sekunden quittiert GDELT mit „Please limit requests…". Alle drei Fehler
+  kommen als Prosa statt als Statuscode, werden deshalb am Textkörper erkannt
+  und bei Drosselung mit Backoff wiederholt.
 - [NINA-API des BBK](https://nina.api.bund.dev/) — MoWaS, Katwarn, Biwapp, Polizei (`warnung.bund.de/api31`).
 - Google-Search-Grounding über die Gemini API (`gemini-2.5-flash`, Fallback `gemini-2.5-pro`).
 - [Nominatim](https://nominatim.org/release-docs/latest/api/Search/) — Geocoding der Vorfallsorte.

@@ -61,6 +61,9 @@ export default async (req) => {
       `scan-run: collected ${articles.length} GDELT articles, ${warnings.length} NINA warnings` +
         (errors.length ? `, collector errors: ${errors.join("; ")}` : "")
     );
+    /* A collector that contributes nothing degrades the Lagebild quietly, so
+       it gets its own warning rather than just a zero in the summary above. */
+    if (!articles.length) console.warn("scan-run: GDELT contributed no articles");
 
     /* Pass A is enrichment: if grounding fails, the deterministic material
        still carries the scan. Pass B is the product and must succeed. */
