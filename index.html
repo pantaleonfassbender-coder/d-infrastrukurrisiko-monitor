@@ -16,7 +16,8 @@
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-        #map { height: 380px; border-radius: 0.5rem; z-index: 0; }
+        #map { height: 460px; border-radius: 0.5rem; z-index: 0; }
+        @media (min-width: 1280px) { #map { height: 620px; } }
         .leaflet-container { font: inherit; }
     </style>
 </head>
@@ -25,29 +26,31 @@
     <div class="min-h-screen flex flex-col md:flex-row">
 
         <!-- Sidebar -->
-        <aside class="w-full md:w-64 bg-white border-b md:border-r border-slate-200 flex flex-col shrink-0 z-20">
+        <aside class="w-full md:w-72 xl:w-80 bg-white border-b md:border-r border-slate-200 flex flex-col shrink-0 z-20">
             <div class="p-6 border-b border-slate-100">
                 <div class="flex items-center gap-2 text-blue-600 mb-1">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    <span class="font-black text-lg tracking-tighter uppercase">Infrastruktur</span>
+                    <span class="font-black text-xl tracking-tighter uppercase">Infrastruktur</span>
                 </div>
-                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-8">Radar Deutschland</div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-widest pl-8">Radar Deutschland</div>
             </div>
 
             <div class="p-4 space-y-4 flex-grow">
                 <div class="p-4 bg-slate-100 rounded-lg">
                     <div class="flex items-center gap-2 mb-2">
                         <div id="status-dot" class="h-2 w-2 rounded-full bg-slate-300"></div>
-                        <span class="text-[10px] font-bold text-slate-500 uppercase">System Status</span>
+                        <span class="text-xs font-bold text-slate-500 uppercase">System Status</span>
                     </div>
-                    <p id="status-text" class="text-xs font-medium text-slate-600">Lade Lagebild…</p>
-                    <p id="status-engine" class="text-[9px] text-slate-400 mt-1"></p>
+                    <p id="status-text" class="text-sm font-medium text-slate-600">Lade Lagebild…</p>
+                    <p id="status-engine" class="text-[11px] text-slate-400 mt-1"></p>
                 </div>
 
                 <div class="p-4 bg-slate-100 rounded-lg">
-                    <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Quellenbasis</div>
-                    <div class="space-y-1 text-[11px] text-slate-600">
+                    <div class="text-xs font-bold text-slate-500 uppercase mb-2">Quellenbasis</div>
+                    <div class="space-y-1 text-[13px] text-slate-600">
                         <div class="flex justify-between"><span>GDELT-Artikel</span><span id="stat-gdelt" class="font-bold">–</span></div>
+                        <div class="flex justify-between"><span>Nachrichten-Feeds</span><span id="stat-news" class="font-bold">–</span></div>
+                        <div class="flex justify-between"><span>News-Archiv (30 T.)</span><span id="stat-archive" class="font-bold">–</span></div>
                         <div class="flex justify-between"><span>NINA-Warnungen</span><span id="stat-nina" class="font-bold">–</span></div>
                         <div class="flex justify-between"><span>Belegte Quellen</span><span id="stat-sources" class="font-bold">–</span></div>
                         <div class="flex justify-between"><span>Vorfälle (30 T.)</span><span id="stat-incidents" class="font-bold">–</span></div>
@@ -55,10 +58,12 @@
                 </div>
 
                 <div class="p-4 bg-slate-100 rounded-lg">
-                    <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Methodik</div>
-                    <p class="text-[10px] text-slate-500 leading-relaxed">
-                        Täglicher Scan aus drei Schichten: GDELT-Nachrichtensuche, amtliche
+                    <div class="text-xs font-bold text-slate-500 uppercase mb-2">Methodik</div>
+                    <p class="text-xs text-slate-500 leading-relaxed">
+                        Täglicher Scan aus vier Schichten: GDELT-Nachrichtensuche, die
+                        RSS-Feeds der großen deutschen Nachrichtenhäuser, amtliche
                         NINA-Warnmeldungen (BBK) und eine KI-Recherche mit Such-Grounding.
+                        Die Schlagzeilen sammeln sich in einem rollierenden 30-Tage-Archiv.
                         Nur verifizierte Ereignisse der letzten 30 Tage erhöhen den Score;
                         ohne neue Vorfälle gilt die Baseline von ~35 Punkten.
                     </p>
@@ -66,32 +71,34 @@
             </div>
 
             <div class="p-4 border-t border-slate-100">
-                <p class="text-[10px] text-slate-500 leading-tight">© Dr. Pantaleon Fassbender</p>
-                <p class="text-[10px] mt-1"><a href="impressum.html" class="text-blue-600 hover:underline">Impressum &amp; Datenschutz</a></p>
+                <p class="text-xs text-slate-500 leading-tight">© Dr. Pantaleon Fassbender</p>
+                <p class="text-xs mt-1"><a href="impressum.html" class="text-blue-600 hover:underline">Impressum &amp; Datenschutz</a></p>
             </div>
         </aside>
 
         <!-- Main -->
         <main class="flex-1 flex flex-col bg-slate-50 min-w-0">
 
-            <header class="px-6 md:px-8 py-6 bg-white border-b border-slate-200 flex flex-wrap gap-4 justify-between items-center shadow-sm">
+            <header class="px-6 md:px-10 py-8 bg-white border-b border-slate-200 flex flex-wrap gap-4 justify-between items-center shadow-sm">
                 <div>
-                    <h2 class="text-xl font-black uppercase text-slate-800 tracking-tight">Lagebild Infrastruktur-Sicherheit</h2>
-                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                    <h2 class="text-3xl font-black uppercase text-slate-800 tracking-tight">Lagebild Infrastruktur-Sicherheit</h2>
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">
                         <span id="last-update">Noch kein Scan</span>
                     </div>
                 </div>
                 <button id="scan-btn"
-                    class="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-[11px] font-black uppercase tracking-wide transition-all shadow-md bg-slate-900 hover:opacity-90 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                    class="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-[13px] font-black uppercase tracking-wide transition-all shadow-md bg-slate-900 hover:opacity-90 disabled:bg-slate-400 disabled:cursor-not-allowed">
                     <svg id="scan-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     <span id="scan-label">Scan aktualisieren</span>
                 </button>
             </header>
 
-            <div id="notice" class="hidden mx-6 md:mx-8 mt-6 p-4 rounded-xl text-sm font-medium"></div>
+            <div id="notice" class="hidden mx-6 md:mx-10 mt-6 p-4 rounded-xl text-base font-medium"></div>
 
-            <div class="flex-1 p-6 md:p-8">
-                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 max-w-7xl mx-auto">
+            <!-- Volle Breite: kein Breiten-Deckel, damit Text und Abbildungen
+                 den ganzen Viewport nutzen. -->
+            <div class="flex-1 p-6 md:p-8 xl:p-10">
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 w-full">
 
                     <!-- Linke Spalte -->
                     <div class="xl:col-span-7 space-y-6 min-w-0">
@@ -100,52 +107,55 @@
                         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
                             <div class="flex flex-col md:flex-row items-center gap-8">
                                 <div class="shrink-0 text-center">
-                                    <svg id="gauge" width="180" height="110" viewBox="0 0 180 110"></svg>
-                                    <div class="-mt-8">
-                                        <span id="score-value" class="text-4xl font-black text-slate-300">--</span>
-                                        <div id="score-level" class="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Kein Lagebild</div>
+                                    <svg id="gauge" width="260" height="164" viewBox="0 0 260 164" class="mx-auto"></svg>
+                                    <div class="-mt-14">
+                                        <span id="score-value" class="text-6xl font-black text-slate-300">--</span>
+                                        <div id="score-level" class="text-xs font-black uppercase tracking-widest text-slate-400 mt-1">Kein Lagebild</div>
                                     </div>
                                 </div>
                                 <div class="flex-grow w-full">
-                                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Risiko nach Sektor</h3>
+                                    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">Risiko nach Sektor</h3>
                                     <div id="sectors" class="space-y-2"></div>
                                 </div>
                             </div>
                             <div class="mt-6 pt-4 border-t border-slate-100 grid grid-cols-3 gap-2">
                                 <div class="bg-slate-50 p-2 rounded border border-slate-100">
-                                    <div class="text-[10px] font-bold text-emerald-600">35–45 Pkt</div>
-                                    <div class="text-[10px] text-slate-400">Baseline (Latenz)</div>
+                                    <div class="text-xs font-bold text-emerald-600">35–45 Pkt</div>
+                                    <div class="text-xs text-slate-400">Baseline (Latenz)</div>
                                 </div>
                                 <div class="bg-slate-50 p-2 rounded border border-slate-100">
-                                    <div class="text-[10px] font-bold text-amber-500">50–70 Pkt</div>
-                                    <div class="text-[10px] text-slate-400">Neue Warnhinweise</div>
+                                    <div class="text-xs font-bold text-amber-500">50–70 Pkt</div>
+                                    <div class="text-xs text-slate-400">Neue Warnhinweise</div>
                                 </div>
                                 <div class="bg-slate-50 p-2 rounded border border-slate-100">
-                                    <div class="text-[10px] font-bold text-red-600">75+ Pkt</div>
-                                    <div class="text-[10px] text-slate-400">Akuter Angriff</div>
+                                    <div class="text-xs font-bold text-red-600">75+ Pkt</div>
+                                    <div class="text-xs text-slate-400">Akuter Angriff</div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Verlauf -->
                         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Score-Verlauf (90 Tage)</h3>
-                            <div id="chart-wrap" class="overflow-x-auto">
-                                <svg id="chart" width="100%" height="190" viewBox="0 0 640 190" preserveAspectRatio="none"></svg>
+                            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Score-Verlauf (90 Tage)</h3>
+                            <!-- Breite und viewBox werden in renderChart an den
+                                 Container angepasst, damit die Kurve unverzerrt
+                                 über die ganze Breite läuft. -->
+                            <div id="chart-wrap" class="w-full">
+                                <svg id="chart" class="w-full" height="340" viewBox="0 0 1200 340"></svg>
                             </div>
-                            <p id="chart-empty" class="text-xs text-slate-400 text-center py-6 hidden">Noch keine Historie — sie füllt sich mit jedem täglichen Scan.</p>
+                            <p id="chart-empty" class="text-sm text-slate-400 text-center py-6 hidden">Noch keine Historie — sie füllt sich mit jedem täglichen Scan.</p>
                         </div>
 
                         <!-- Lagebericht -->
                         <div class="bg-slate-900 rounded-xl border border-slate-800 p-8 shadow-xl">
                             <div class="mb-6 pb-4 border-b border-white/10">
-                                <h3 class="font-bold text-white text-lg">Lagebericht (30 Tage)</h3>
-                                <p class="text-xs text-slate-400 mt-1">KI-Synthese aus GDELT, NINA und Such-Grounding.</p>
+                                <h3 class="font-bold text-white text-xl">Lagebericht (30 Tage)</h3>
+                                <p class="text-sm text-slate-400 mt-1">KI-Synthese aus GDELT, deutschen Nachrichten-Feeds, NINA und Such-Grounding.</p>
                             </div>
-                            <div id="assessment" class="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap mb-6 italic">Bitte Scan starten oder auf den täglichen Lauf warten.</div>
+                            <div id="assessment" class="text-slate-300 text-base leading-relaxed whitespace-pre-wrap mb-6 italic">Bitte Scan starten oder auf den täglichen Lauf warten.</div>
                             <details id="report-details" class="hidden">
-                                <summary class="text-xs text-blue-400 cursor-pointer uppercase font-bold tracking-widest">Ausführlicher Recherche-Bericht</summary>
-                                <div id="report-text" class="text-slate-400 text-xs leading-relaxed whitespace-pre-wrap mt-4"></div>
+                                <summary class="text-sm text-blue-400 cursor-pointer uppercase font-bold tracking-widest">Ausführlicher Recherche-Bericht</summary>
+                                <div id="report-text" class="text-slate-400 text-sm leading-relaxed whitespace-pre-wrap mt-4"></div>
                             </details>
                         </div>
                     </div>
@@ -156,8 +166,8 @@
                         <!-- Karte -->
                         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
                             <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest">Vorfallskarte</h3>
-                                <div class="flex items-center gap-3 text-[9px] text-slate-400">
+                                <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest">Vorfallskarte</h3>
+                                <div class="flex items-center gap-3 text-[11px] text-slate-400">
                                     <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-500 inline-block"></span>gering</span>
                                     <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-orange-500 inline-block"></span>mittel</span>
                                     <span class="flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-red-600 inline-block"></span>hoch</span>
@@ -168,18 +178,25 @@
 
                         <!-- Vorfälle -->
                         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                            <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Vorfälle (30 Tage)</h3>
-                            <div id="incidents" class="space-y-3 max-h-[420px] overflow-y-auto custom-scrollbar pr-2">
-                                <div class="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Warte auf Scan…</div>
+                            <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">Vorfälle (30 Tage)</h3>
+                            <div id="incidents" class="space-y-3 max-h-[620px] overflow-y-auto custom-scrollbar pr-2">
+                                <div class="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Warte auf Scan…</div>
                             </div>
                         </div>
 
                         <!-- Quellen -->
                         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                            <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Quellen-Feed</h3>
-                            <div id="sources" class="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar pr-2">
-                                <div class="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Warte auf Scan…</div>
+                            <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">Quellen-Feed</h3>
+                            <div id="sources" class="space-y-2 max-h-[520px] overflow-y-auto custom-scrollbar pr-2">
+                                <div class="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Warte auf Scan…</div>
                             </div>
+                        </div>
+
+                        <!-- Quellen-Hinweise: was im letzten Lauf nicht geklappt hat,
+                             in Klartext statt im Wortlaut der jeweiligen API. -->
+                        <div id="hints-card" class="hidden bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                            <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">Quellen-Hinweise</h3>
+                            <ul id="hints" class="space-y-3"></ul>
                         </div>
                     </div>
                 </div>
@@ -214,7 +231,11 @@
                     { uri: "https://example.org/a", title: "Beispielquelle A", origin: "grounding" },
                     { uri: "https://example.org/b", title: "Beispielquelle B", origin: "grounding" }
                 ],
-                stats: { gdeltArticles: 42, ninaWarnings: 7, model: "demo", groundedModel: "demo", collectorErrors: [] }
+                stats: {
+                    gdeltArticles: 0, newsArticles: 38, archiveArticles: 96, ninaWarnings: 7,
+                    model: "demo", groundedModel: "demo",
+                    collectorErrors: ["gdelt: Rate-Limit der GDELT-API (HTTP 429) — auch nach 4 Versuchen"]
+                }
             },
             history: Array.from({ length: 60 }, (_, i) => {
                 const d = new Date(Date.now() - (59 - i) * 86400000);
@@ -293,15 +314,15 @@
         function renderGauge(score) {
             const svg = el("gauge");
             const color = scoreColor(score);
-            const cx = 90, cy = 100, r = 75;
+            const cx = 130, cy = 142, r = 108;
             const angle = Math.PI * (1 - score / 100);
             const x = cx + r * Math.cos(angle), y = cy - r * Math.sin(angle);
             /* The value arc spans at most the semicircle (180°), so the
                large-arc flag is always 0. */
             svg.innerHTML =
-                '<path d="M ' + (cx - r) + " " + cy + " A " + r + " " + r + ' 0 0 1 ' + (cx + r) + " " + cy + '" fill="none" stroke="#e2e8f0" stroke-width="14" stroke-linecap="round"/>' +
+                '<path d="M ' + (cx - r) + " " + cy + " A " + r + " " + r + ' 0 0 1 ' + (cx + r) + " " + cy + '" fill="none" stroke="#e2e8f0" stroke-width="20" stroke-linecap="round"/>' +
                 (score > 0
-                    ? '<path d="M ' + (cx - r) + " " + cy + " A " + r + " " + r + ' 0 0 1 ' + x.toFixed(1) + " " + y.toFixed(1) + '" fill="none" stroke="' + color + '" stroke-width="14" stroke-linecap="round"/>'
+                    ? '<path d="M ' + (cx - r) + " " + cy + " A " + r + " " + r + ' 0 0 1 ' + x.toFixed(1) + " " + y.toFixed(1) + '" fill="none" stroke="' + color + '" stroke-width="20" stroke-linecap="round"/>'
                     : "");
             el("score-value").textContent = score;
             el("score-value").style.color = color;
@@ -312,18 +333,23 @@
         function renderSectors(sectors) {
             el("sectors").innerHTML = (sectors || []).map((s) =>
                 '<div class="flex items-center gap-3">' +
-                '<span class="w-20 text-[10px] font-bold uppercase text-slate-500 shrink-0">' + esc(s.label || SECTOR_LABELS[s.key] || s.key) + "</span>" +
+                '<span class="w-20 text-xs font-bold uppercase text-slate-500 shrink-0">' + esc(s.label || SECTOR_LABELS[s.key] || s.key) + "</span>" +
                 '<div class="flex-grow bg-slate-100 rounded-full h-2.5 overflow-hidden">' +
                 '<div class="h-2.5 rounded-full transition-all" style="width:' + Math.max(2, s.score) + "%;background:" + scoreColor(s.score) + '"></div></div>' +
-                '<span class="w-8 text-right text-[11px] font-bold" style="color:' + scoreColor(s.score) + '">' + s.score + "</span></div>"
+                '<span class="w-8 text-right text-[13px] font-bold" style="color:' + scoreColor(s.score) + '">' + s.score + "</span></div>"
             ).join("");
         }
 
         // ---------- Verlauf ----------
+        /* The chart is drawn at the container's real pixel width instead of a
+           fixed viewBox: full width without the horizontal stretching that
+           preserveAspectRatio="none" caused, and legible labels at any size. */
+        let lastHistory = [];
         function renderChart(history) {
+            lastHistory = Array.isArray(history) ? history : [];
             const svg = el("chart");
             const empty = el("chart-empty");
-            const data = (history || []).slice(-90);
+            const data = lastHistory.slice(-90);
             if (data.length < 2) {
                 svg.style.display = "none";
                 empty.classList.remove("hidden");
@@ -331,40 +357,49 @@
             }
             svg.style.display = "";
             empty.classList.add("hidden");
-            const W = 640, H = 190, padL = 30, padR = 10, padT = 12, padB = 24;
+            const H = 340, padL = 46, padR = 22, padT = 20, padB = 40;
+            const W = Math.max(560, Math.round(el("chart-wrap").clientWidth || 900));
+            svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+            svg.setAttribute("height", H);
             const x = (i) => padL + (i / (data.length - 1)) * (W - padL - padR);
             const y = (v) => padT + (1 - v / 100) * (H - padT - padB);
             let out = "";
             for (const g of [0, 25, 50, 75, 100]) {
                 out += '<line x1="' + padL + '" y1="' + y(g) + '" x2="' + (W - padR) + '" y2="' + y(g) + '" stroke="#f1f5f9" stroke-width="1"/>' +
-                    '<text x="' + (padL - 6) + '" y="' + (y(g) + 3) + '" text-anchor="end" font-size="9" fill="#94a3b8">' + g + "</text>";
+                    '<text x="' + (padL - 10) + '" y="' + (y(g) + 5) + '" text-anchor="end" font-size="14" fill="#94a3b8">' + g + "</text>";
             }
-            out += '<line x1="' + padL + '" y1="' + y(45) + '" x2="' + (W - padR) + '" y2="' + y(45) + '" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>';
-            out += '<line x1="' + padL + '" y1="' + y(70) + '" x2="' + (W - padR) + '" y2="' + y(70) + '" stroke="#dc2626" stroke-width="1" stroke-dasharray="4 4" opacity="0.5"/>';
+            out += '<line x1="' + padL + '" y1="' + y(45) + '" x2="' + (W - padR) + '" y2="' + y(45) + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.6"/>';
+            out += '<line x1="' + padL + '" y1="' + y(70) + '" x2="' + (W - padR) + '" y2="' + y(70) + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.6"/>';
             const pts = data.map((d, i) => x(i).toFixed(1) + "," + y(d.score).toFixed(1)).join(" ");
-            out += '<polyline points="' + pts + '" fill="none" stroke="#2563eb" stroke-width="2"/>';
+            out += '<polyline points="' + pts + '" fill="none" stroke="#2563eb" stroke-width="3" stroke-linejoin="round"/>';
             data.forEach((d, i) => {
-                out += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(d.score).toFixed(1) + '" r="3" fill="#2563eb" opacity="0.85"><title>' + esc(fmtDate(d.date)) + ": " + d.score + "</title></circle>";
+                out += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(d.score).toFixed(1) + '" r="4.5" fill="#2563eb" opacity="0.85"><title>' + esc(fmtDate(d.date)) + ": " + d.score + "</title></circle>";
             });
-            out += '<text x="' + padL + '" y="' + (H - 6) + '" font-size="9" fill="#94a3b8">' + esc(fmtDate(data[0].date)) + "</text>";
-            out += '<text x="' + (W - padR) + '" y="' + (H - 6) + '" text-anchor="end" font-size="9" fill="#94a3b8">' + esc(fmtDate(data[data.length - 1].date)) + "</text>";
+            out += '<text x="' + padL + '" y="' + (H - 10) + '" font-size="14" fill="#94a3b8">' + esc(fmtDate(data[0].date)) + "</text>";
+            out += '<text x="' + (W - padR) + '" y="' + (H - 10) + '" text-anchor="end" font-size="14" fill="#94a3b8">' + esc(fmtDate(data[data.length - 1].date)) + "</text>";
             svg.innerHTML = out;
         }
+
+        let chartResizeTimer = null;
+        window.addEventListener("resize", () => {
+            clearTimeout(chartResizeTimer);
+            chartResizeTimer = setTimeout(() => renderChart(lastHistory), 150);
+        });
 
         // ---------- Listen ----------
         function renderIncidents(incidents) {
             const box = el("incidents");
             if (!incidents || !incidents.length) {
-                box.innerHTML = '<div class="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Keine verifizierten Vorfälle in den letzten 30 Tagen — Score auf Baseline.</div>';
+                box.innerHTML = '<div class="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Keine verifizierten Vorfälle in den letzten 30 Tagen — Score auf Baseline.</div>';
                 return;
             }
             box.innerHTML = incidents.map((inc) =>
                 '<div class="p-3 rounded-lg border border-slate-100 bg-slate-50">' +
                 '<div class="flex items-start justify-between gap-2">' +
-                '<p class="text-xs font-bold text-slate-800 leading-snug">' + esc(inc.titel) + "</p>" +
-                '<span class="shrink-0 text-[9px] font-black text-white px-1.5 py-0.5 rounded" style="background:' + sevColor(inc.schweregrad) + '">S' + inc.schweregrad + "</span></div>" +
-                (inc.beschreibung ? '<p class="text-[11px] text-slate-500 mt-1 leading-snug">' + esc(inc.beschreibung) + "</p>" : "") +
-                '<div class="flex flex-wrap items-center gap-2 mt-2 text-[9px] text-slate-400">' +
+                '<p class="text-sm font-bold text-slate-800 leading-snug">' + esc(inc.titel) + "</p>" +
+                '<span class="shrink-0 text-[11px] font-black text-white px-1.5 py-0.5 rounded" style="background:' + sevColor(inc.schweregrad) + '">S' + inc.schweregrad + "</span></div>" +
+                (inc.beschreibung ? '<p class="text-[13px] text-slate-500 mt-1 leading-snug">' + esc(inc.beschreibung) + "</p>" : "") +
+                '<div class="flex flex-wrap items-center gap-2 mt-2 text-[11px] text-slate-400">' +
                 '<span class="bg-white px-1.5 py-0.5 rounded border border-slate-200">' + esc(inc.ort) + "</span>" +
                 '<span class="bg-white px-1.5 py-0.5 rounded border border-slate-200">' + esc(fmtDate(inc.date)) + "</span>" +
                 '<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">' + esc(SECTOR_LABELS[inc.sektor] || inc.sektor) + "</span>" +
@@ -376,15 +411,67 @@
         function renderSources(sources) {
             const box = el("sources");
             if (!sources || !sources.length) {
-                box.innerHTML = '<div class="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Keine Grounding-Quellen im letzten Scan.</div>';
+                box.innerHTML = '<div class="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Keine Grounding-Quellen im letzten Scan.</div>';
                 return;
             }
             box.innerHTML = sources.map((s) => {
                 let host = "";
                 try { host = new URL(s.uri).hostname.replace("www.", ""); } catch { host = ""; }
                 return '<a href="' + esc(s.uri) + '" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-slate-100 hover:border-blue-400 bg-slate-50 group">' +
-                    '<span class="text-[11px] font-medium text-slate-700 group-hover:text-blue-600 truncate">' + esc(s.title) + "</span>" +
-                    '<span class="text-[9px] text-slate-400 shrink-0">' + esc(host) + "</span></a>";
+                    '<span class="text-[13px] font-medium text-slate-700 group-hover:text-blue-600 truncate">' + esc(s.title) + "</span>" +
+                    '<span class="text-[11px] text-slate-400 shrink-0">' + esc(host) + "</span></a>";
+            }).join("");
+        }
+
+        /*
+         * Quellen-Hinweise. The scan records one short note per source that
+         * did not answer; they are shown as plain sentences, because the raw
+         * note ("gdelt: Rate-Limit der GDELT-API (HTTP 429) …") only makes
+         * sense to whoever wrote the collector.
+         */
+        const HINT_SOURCES = [
+            [/^gdelt:\s*/i, "GDELT-Nachrichtensuche"],
+            [/^feeds\/([\w-]+):\s*/i, "Nachrichten-Feed"],
+            [/^feeds:\s*/i, "Nachrichten-Feeds"],
+            [/^nina\/([\w-]+):\s*/i, "NINA-Kanal"],
+            [/^nina:\s*/i, "NINA-Warnmeldungen"],
+            [/^grounding:\s*/i, "KI-Recherche (Such-Grounding)"]
+        ];
+
+        function describeHint(note) {
+            const raw = String(note || "").trim();
+            let label = "Quelle";
+            let detail = raw;
+            for (const [rx, name] of HINT_SOURCES) {
+                const m = rx.exec(raw);
+                if (!m) continue;
+                label = m[1] ? name + " " + m[1] : name;
+                detail = raw.slice(m[0].length);
+                break;
+            }
+            if (/rate-limit|429/i.test(detail)) {
+                detail = "Die API drosselt Abfragen aus Rechenzentren (HTTP 429). " +
+                    "Die Nachrichtenlage dieses Laufs stammt daher aus den deutschen " +
+                    "Nachrichten-Feeds und dem 30-Tage-Archiv.";
+            }
+            return { label, detail: detail.slice(0, 240) || "ohne Angabe" };
+        }
+
+        function renderHints(notes) {
+            const card = el("hints-card");
+            const list = el("hints");
+            const items = (notes || []).filter(Boolean);
+            if (!items.length) {
+                card.classList.add("hidden");
+                list.innerHTML = "";
+                return;
+            }
+            card.classList.remove("hidden");
+            list.innerHTML = items.map((n) => {
+                const { label, detail } = describeHint(n);
+                return '<li class="p-3 rounded-lg bg-amber-50 border border-amber-200">' +
+                    '<div class="text-[11px] font-black uppercase tracking-widest text-amber-700">' + esc(label) + "</div>" +
+                    '<p class="text-[13px] text-slate-600 mt-1 leading-snug">' + esc(detail) + "</p></li>";
             }).join("");
         }
 
@@ -406,11 +493,13 @@
                 el("status-text").textContent = "Noch kein Lagebild vorhanden";
             }
             renderChart(history);
-            if (!latest) { ensureMap(); return; }
+            if (!latest) { renderHints([]); ensureMap(); return; }
 
             el("last-update").textContent = "Stand: " + fmtDateTime(latest.generatedAt);
             el("status-engine").textContent = latest.stats?.model ? "Engine: " + latest.stats.model : "";
             el("stat-gdelt").textContent = latest.stats?.gdeltArticles ?? "–";
+            el("stat-news").textContent = latest.stats?.newsArticles ?? "–";
+            el("stat-archive").textContent = latest.stats?.archiveArticles ?? "–";
             el("stat-nina").textContent = latest.stats?.ninaWarnings ?? "–";
             el("stat-sources").textContent = (latest.sources || []).length;
             el("stat-incidents").textContent = (latest.incidents || []).length;
@@ -423,6 +512,7 @@
             renderMap(latest.incidents || []);
             renderIncidents(latest.incidents || []);
             renderSources(latest.sources || []);
+            renderHints(latest.stats?.collectorErrors || []);
 
             el("assessment").classList.remove("italic");
             el("assessment").textContent = latest.assessment;
@@ -434,7 +524,7 @@
 
         function notice(msg, kind) {
             const n = el("notice");
-            n.className = "mx-6 md:mx-8 mt-6 p-4 rounded-xl text-sm font-medium " +
+            n.className = "mx-6 md:mx-8 mt-6 p-4 rounded-xl text-base font-medium " +
                 (kind === "error" ? "bg-red-100 border border-red-200 text-red-700" : "bg-blue-50 border border-blue-200 text-blue-700");
             n.textContent = msg;
             n.classList.remove("hidden");
