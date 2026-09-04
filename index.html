@@ -52,6 +52,7 @@
                         <div class="flex justify-between"><span>Belegte Quellen</span><span id="stat-sources" class="font-bold">–</span></div>
                         <div class="flex justify-between"><span>Vorfälle (30 T.)</span><span id="stat-incidents" class="font-bold">–</span></div>
                     </div>
+                    <div id="collector-warn" class="hidden mt-2 pt-2 border-t border-slate-200 text-[10px] text-amber-700 leading-snug"></div>
                 </div>
 
                 <div class="p-4 bg-slate-100 rounded-lg">
@@ -214,7 +215,7 @@
                     { uri: "https://example.org/a", title: "Beispielquelle A", origin: "grounding" },
                     { uri: "https://example.org/b", title: "Beispielquelle B", origin: "grounding" }
                 ],
-                stats: { gdeltArticles: 42, ninaWarnings: 7, model: "demo", groundedModel: "demo", collectorErrors: [] }
+                stats: { gdeltArticles: 42, ninaWarnings: 7, model: "demo", groundedModel: "demo", collectorErrors: ["nina/katwarn: HTTP 503 from warnung.bund.de"] }
             },
             history: Array.from({ length: 60 }, (_, i) => {
                 const d = new Date(Date.now() - (59 - i) * 86400000);
@@ -410,8 +411,9 @@
 
             el("last-update").textContent = "Stand: " + fmtDateTime(latest.generatedAt);
             el("status-engine").textContent = latest.stats?.model ? "Engine: " + latest.stats.model : "";
-            el("stat-gdelt").textContent = latest.stats?.gdeltArticles ?? "–";
-            el("stat-nina").textContent = latest.stats?.ninaWarnings ?? "–";
+            renderSourceCount("stat-gdelt", latest.stats?.gdeltArticles);
+            renderSourceCount("stat-nina", latest.stats?.ninaWarnings);
+            renderCollectorWarn(latest.stats?.collectorErrors || []);
             el("stat-sources").textContent = (latest.sources || []).length;
             el("stat-incidents").textContent = (latest.incidents || []).length;
 
@@ -430,6 +432,21 @@
                 el("report-details").classList.remove("hidden");
                 el("report-text").textContent = latest.report;
             }
+        }
+
+        /* A source that delivered nothing is a defect, not a quiet zero: it reads
+           red here and the collector's own message is spelled out below. */
+        function renderSourceCount(id, count) {
+            const node = el(id);
+            node.textContent = count ?? "–";
+            node.className = count ? "font-bold" : "font-bold text-red-600";
+        }
+
+        function renderCollectorWarn(errors) {
+            const box = el("collector-warn");
+            if (!errors.length) { box.classList.add("hidden"); return; }
+            box.textContent = "Quellen-Hinweise: " + errors.join(" · ");
+            box.classList.remove("hidden");
         }
 
         function notice(msg, kind) {
