@@ -9,14 +9,14 @@
      Seite auch trägt, wenn die Anwendung selbst nicht startet. -->
 <style>
   body { margin: 0; background: #f8fafc; color: #0f172a; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.65; }
-  main { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
-  h1 { font-size: 1.6rem; letter-spacing: -0.02em; }
-  h2 { font-size: 1.05rem; margin-top: 2.2rem; text-transform: uppercase; letter-spacing: 0.06em; color: #334155; }
-  p, li { font-size: 0.95rem; color: #1e293b; }
+  main { max-width: 58rem; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
+  h1 { font-size: 2rem; letter-spacing: -0.02em; }
+  h2 { font-size: 1.2rem; margin-top: 2.2rem; text-transform: uppercase; letter-spacing: 0.06em; color: #334155; }
+  p, li { font-size: 1.075rem; color: #1e293b; }
   a { color: #2563eb; }
-  .top { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+  .top { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
   .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; padding: 1.25rem 1.5rem; margin-top: 1rem; }
-  footer { margin-top: 3rem; font-size: 0.8rem; color: #64748b; }
+  footer { margin-top: 3rem; font-size: 0.9rem; color: #64748b; }
 </style>
 </head>
 <body>
@@ -71,14 +71,19 @@
   <h2>Wie das Lagebild entsteht</h2>
   <div class="card">
     <p>Ein serverseitiger Lauf (Netlify Functions) sammelt deutschsprachige Nachrichten über die
-    GDELT-DOC-API und amtliche Warnmeldungen der NINA-Schnittstelle des BBK (warnung.bund.de),
+    GDELT-DOC-API und die öffentlichen RSS-Feeds der großen deutschen Nachrichtenhäuser
+    (u.&nbsp;a. tagesschau, ZDFheute, Deutschlandfunk, Spiegel, Zeit, FAZ, Süddeutsche, Welt,
+    ntv, heise) sowie amtliche Warnmeldungen der NINA-Schnittstelle des BBK (warnung.bund.de),
     lässt Google Gemini mit Such-Grounding recherchieren und konsolidiert alles zu Score,
-    Sektorwerten und Vorfallsliste. Ortsnamen aus den Vorfällen werden über Nominatim
-    (OpenStreetMap) in Koordinaten aufgelöst. <strong>An keiner dieser Stellen fließen
-    Besucherdaten:</strong> Google, GDELT, das BBK und Nominatim sehen nur die Anfragen des
-    Servers, nie Ihren Browser.</p>
+    Sektorwerten und Vorfallsliste. Aus den Feeds werden ausschließlich Schlagzeile, Link und
+    Datum übernommen, und nur, wenn sie Infrastruktur-Sicherheit betreffen. Ortsnamen aus den
+    Vorfällen werden über Nominatim (OpenStreetMap) in Koordinaten aufgelöst.
+    <strong>An keiner dieser Stellen fließen Besucherdaten:</strong> Google, GDELT, die
+    Nachrichtenhäuser, das BBK und Nominatim sehen nur die Anfragen des Servers, nie Ihren
+    Browser.</p>
     <p>Gespeichert werden ausschließlich die Ergebnisse: das aktuelle Lagebild, die
-    Score-Historie und ein Cache aufgelöster Ortsnamen (Netlify Blobs). Keiner dieser Datensätze
+    Score-Historie, ein rollierendes 30-Tage-Archiv der gesammelten Schlagzeilen (Titel, Link,
+    Datum) und ein Cache aufgelöster Ortsnamen (Netlify Blobs). Keiner dieser Datensätze
     enthält personenbezogene Daten von Besucherinnen und Besuchern — auch keine gekürzten oder
     gehashten IP-Adressen.</p>
   </div>

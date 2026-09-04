@@ -8,6 +8,7 @@
  * Results live in Netlify Blobs (store "infra-monitor"):
  *   latest    - the full current Lagebild the site renders
  *   history   - one {date, score, sectors, incidentCount} entry per day
+ *   articles  - rolling 30-day archive of collected headlines
  *   geocache  - place name -> coordinates, so recurring places skip Nominatim
  *   runstate  - throttle and status bookkeeping
  *
@@ -17,11 +18,14 @@
  */
 
 import { getStore } from "@netlify/blobs";
-import { collectAll } from "../../lib/sources.mjs";
+import { collectAll, mergeArticles } from "../../lib/sources.mjs";
 import { groundedReport, structuredAnalysis } from "../../lib/gemini.mjs";
 import { normalizeAnalysis, geocodeIncidents, updateHistory } from "../../lib/core.mjs";
 
 const MIN_INTERVAL_MS = 10 * 60 * 1000;
+
+/* How many archived headlines pass B may see. The archive itself keeps more. */
+const PROMPT_ARTICLE_LIMIT = 150;
 
 export default async (req) => {
   const token = process.env.SCAN_TOKEN;
@@ -56,10 +60,19 @@ export default async (req) => {
   try {
     console.log(`scan-run: started (source: ${source})`);
 
-    const { articles, warnings, errors } = await collectAll();
+    const { articles: fresh, warnings, errors, counts } = await collectAll();
+
+    /* Publisher feeds only show the current day, so the 30-day news window is
+       an archive in Blobs that every scan tops up. GDELT (when it answers)
+       backfills it with up to 30 days at once. */
+    const archive = mergeArticles(await store.get("articles", { type: "json" }), fresh);
+    await store.setJSON("articles", archive);
+    const articles = archive.slice(0, PROMPT_ARTICLE_LIMIT);
+
     console.log(
-      `scan-run: collected ${articles.length} GDELT articles, ${warnings.length} NINA warnings` +
-        (errors.length ? `, collector errors: ${errors.join("; ")}` : "")
+      `scan-run: collected ${counts.gdelt} GDELT + ${counts.news} feed articles, ` +
+        `${archive.length} in the 30-day archive, ${warnings.length} NINA warnings` +
+        (errors.length ? `, collector notes: ${errors.join("; ")}` : "")
     );
 
     /* Pass A is enrichment: if grounding fails, the deterministic material
@@ -101,7 +114,9 @@ export default async (req) => {
       report: reportText,
       sources: groundedSources,
       stats: {
-        gdeltArticles: articles.length,
+        gdeltArticles: counts.gdelt,
+        newsArticles: counts.news,
+        archiveArticles: archive.length,
         ninaWarnings: warnings.length,
         model,
         groundedModel,
