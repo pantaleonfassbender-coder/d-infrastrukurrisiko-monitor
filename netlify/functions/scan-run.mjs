@@ -90,8 +90,14 @@ export default async (req) => {
     const groundedModel = researched?.model || "";
     if (researched) console.log(`scan-run: research via ${researched.provider}/${groundedModel}, ${groundedSources.length} sources`);
 
+    /* The incidents of the last scan go back in as material D, so the list (and
+       with it the index) does not jump because one run happened to miss a story.
+       Only lists made under method v3 are carried; the model re-checks them. */
+    const previous = await store.get("latest", { type: "json" });
+    const known = previous?.index?.method === "v3" ? (previous.incidents || []).slice(0, 25) : [];
+
     const consolidated = await consolidate(
-      { reportText, sources: groundedSources, articles, warnings, today: new Date().toISOString().slice(0, 10) },
+      { reportText, sources: groundedSources, articles, warnings, known, today: new Date().toISOString().slice(0, 10) },
       llmNotes
     );
     const model = consolidated.model;
