@@ -27,4 +27,12 @@ assert.equal(r.text, "Am 3. Oktober brannte ein Kabelschacht.");
 assert.equal(r.sources[0].uri, "https://b.example/2", "cited sources come first");
 assert.equal(r.sources[0].origin, "zitiert");
 assert.equal(r.sources.length, 2, "no duplicates");
+const q = readResearch({ content: [
+  { type: "web_search_tool_result", tool_use_id: "s1", content: [{ type: "web_search_result", url: "https://de.wikipedia.org/wiki/X", title: "W" }] },
+  { type: "text", text: "Bericht über zwei Vorfälle.\n\nQUELLEN:\n- Brand Marzahn – https://www.tagesspiegel.de/berlin/brand.html\n- Drohne BER – https://www.rbb24.de/drohne.html." },
+] });
+assert.equal(q.text, "Bericht über zwei Vorfälle.", "the source list is cut from the report");
+assert.deepEqual(q.sources.map((s) => s.uri), ["https://www.tagesspiegel.de/berlin/brand.html", "https://www.rbb24.de/drohne.html"]);
+assert.equal(q.sources[0].title, "Brand Marzahn");
+assert.ok(q.sources.every((s) => s.origin === "zitiert"));
 console.log("llm tests passed");
