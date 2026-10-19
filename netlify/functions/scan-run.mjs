@@ -1,6 +1,7 @@
 /*
- * The scan itself, as a background function: collectors, two Gemini passes
- * and geocoding together take a low number of minutes, well past the
+ * The scan itself, as a background function: collectors, two model passes
+ * (Claude, or Gemini as fallback – lib/llm.mjs) and geocoding take a few
+ * minutes, well past the
  * 26-second ceiling on synchronous functions. scan-schedule.mjs is the daily
  * clock and scan-trigger.mjs the manual button; both only enqueue this
  * worker.
@@ -19,7 +20,7 @@
 
 import { getStore } from "@netlify/blobs";
 import { collectAll, mergeArticles } from "../../lib/sources.mjs";
-import { groundedReport, structuredAnalysis } from "../../lib/gemini.mjs";
+import { research, analysis as consolidate, providerOrder } from "../../lib/llm.mjs";
 import { normalizeAnalysis, geocodeIncidents, updateHistory } from "../../lib/core.mjs";
 
 const MIN_INTERVAL_MS = 10 * 60 * 1000;
@@ -51,20 +52,29 @@ export default async (req) => {
   const startedAtIso = new Date().toISOString();
   await store.setJSON("runstate", { startedAt: startedAtIso, source, status: "running" });
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    await failRun(store, "GEMINI_API_KEY is not configured");
+  if (!providerOrder().length) {
+    await failRun(store, "Kein Modellzugang: weder ANTHROPIC_API_KEY (Netlify AI Gateway) noch GEMINI_API_KEY gesetzt");
     return;
   }
 
   try {
     console.log(`scan-run: started (source: ${source})`);
 
-    const { articles: fresh, warnings, errors, counts } = await collectAll();
+    /* Research (pass A) does not need the collected material, so it runs while
+       the collectors wait out GDELT's rate limit. Pass A is enrichment: if it
+       fails everywhere, the deterministic material still carries the scan. */
+    const llmNotes = [];
+    const [collected, researched] = await Promise.all([
+      collectAll(),
+      research(llmNotes).catch((err) => {
+        console.warn(`scan-run: research pass failed (${err.message}), continuing without it`);
+        return null;
+      }),
+    ]);
+    const { articles: fresh, warnings, errors, counts } = collected;
 
     /* Publisher feeds only show the current day, so the 30-day news window is
-       an archive in Blobs that every scan tops up. GDELT (when it answers)
-       backfills it with up to 30 days at once. */
+       an archive in Blobs that every scan tops up. GDELT backfills it. */
     const archive = mergeArticles(await store.get("articles", { type: "json" }), fresh);
     await store.setJSON("articles", archive);
     const articles = archive.slice(0, PROMPT_ARTICLE_LIMIT);
@@ -75,30 +85,20 @@ export default async (req) => {
         (errors.length ? `, collector notes: ${errors.join("; ")}` : "")
     );
 
-    /* Pass A is enrichment: if grounding fails, the deterministic material
-       still carries the scan. Pass B is the product and must succeed. */
-    let reportText = "";
-    let groundedSources = [];
-    let groundedModel = "";
-    try {
-      const grounded = await groundedReport(apiKey);
-      reportText = grounded.text;
-      groundedSources = grounded.sources;
-      groundedModel = grounded.model;
-      console.log(`scan-run: grounded report via ${groundedModel}, ${groundedSources.length} sources`);
-    } catch (err) {
-      errors.push(`grounding: ${err.message}`);
-      console.warn(`scan-run: grounded pass failed (${err.message}), continuing without it`);
-    }
+    const reportText = researched?.text || "";
+    const groundedSources = researched?.sources || [];
+    const groundedModel = researched?.model || "";
+    if (researched) console.log(`scan-run: research via ${researched.provider}/${groundedModel}, ${groundedSources.length} sources`);
 
-    const { analysis: rawAnalysis, model } = await structuredAnalysis(apiKey, {
-      reportText,
-      articles,
-      warnings,
-    });
-    const analysis = normalizeAnalysis(rawAnalysis);
+    const consolidated = await consolidate(
+      { reportText, sources: groundedSources, articles, warnings, today: new Date().toISOString().slice(0, 10) },
+      llmNotes
+    );
+    const model = consolidated.model;
+    const analysis = normalizeAnalysis(consolidated.analysis);
+    errors.push(...llmNotes);
     console.log(
-      `scan-run: structured analysis via ${model}: score ${analysis.score}, ${analysis.incidents.length} incidents`
+      `scan-run: analysis via ${consolidated.provider}/${model}: index ${analysis.score} (load ${analysis.index.load}), ${analysis.incidents.length} incidents`
     );
 
     const geocache = (await store.get("geocache", { type: "json" })) || {};
@@ -120,6 +120,8 @@ export default async (req) => {
         ninaWarnings: warnings.length,
         model,
         groundedModel,
+        provider: consolidated.provider,
+        researchProvider: researched?.provider || "",
         collectorErrors: errors,
       },
     };
@@ -133,6 +135,7 @@ export default async (req) => {
       updateHistory(history, {
         date,
         score: analysis.score,
+        method: analysis.index.method,
         sectors: sectorScores,
         incidentCount: analysis.incidents.length,
       })

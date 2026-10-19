@@ -62,10 +62,12 @@
                     <p class="text-xs text-slate-500 leading-relaxed">
                         Täglicher Scan aus vier Schichten: GDELT-Nachrichtensuche, die
                         RSS-Feeds der großen deutschen Nachrichtenhäuser, amtliche
-                        NINA-Warnmeldungen (BBK) und eine KI-Recherche mit Such-Grounding.
-                        Die Schlagzeilen sammeln sich in einem rollierenden 30-Tage-Archiv.
-                        Nur verifizierte Ereignisse der letzten 30 Tage erhöhen den Score;
-                        ohne neue Vorfälle gilt die Baseline von ~35 Punkten.
+                        NINA-Warnmeldungen (BBK) und eine KI-Recherche mit Websuche
+                        (Claude, ersatzweise Gemini). Die KI bestimmt nur die einzelnen
+                        Vorfälle – Schweregrad 1–5, bestätigt oder Verdacht, Sektor, Ort.
+                        Den Index rechnet das System selbst: Jeder Vorfall zählt nach
+                        Schweregrad, ein Verdacht halb, und sein Gewicht halbiert sich
+                        alle 7 Tage. Ohne Vorfälle steht der Index auf 35.
                     </p>
                 </div>
             </div>
@@ -121,22 +123,31 @@
                             <div class="mt-6 pt-4 border-t border-slate-100 grid grid-cols-3 gap-2">
                                 <div class="bg-slate-50 p-2 rounded border border-slate-100">
                                     <div class="text-xs font-bold text-emerald-600">35–45 Pkt</div>
-                                    <div class="text-xs text-slate-400">Baseline (Latenz)</div>
+                                    <div class="text-xs text-slate-400">Latent – kaum aktuelle Vorfälle</div>
                                 </div>
                                 <div class="bg-slate-50 p-2 rounded border border-slate-100">
-                                    <div class="text-xs font-bold text-amber-500">50–70 Pkt</div>
-                                    <div class="text-xs text-slate-400">Neue Warnhinweise</div>
+                                    <div class="text-xs font-bold text-amber-500">46–70 Pkt</div>
+                                    <div class="text-xs text-slate-400">Erhöht – frische oder schwere Vorfälle</div>
                                 </div>
                                 <div class="bg-slate-50 p-2 rounded border border-slate-100">
-                                    <div class="text-xs font-bold text-red-600">75+ Pkt</div>
-                                    <div class="text-xs text-slate-400">Akuter Angriff</div>
+                                    <div class="text-xs font-bold text-red-600">71+ Pkt</div>
+                                    <div class="text-xs text-slate-400">Kritisch – mehrere schwere, bestätigte Vorfälle</div>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- Was den Index treibt: jeder Punkt lässt sich einem Vorfall zuordnen -->
+                        <div id="drivers-card" class="hidden bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">Was den Index treibt</h3>
+                            <p class="text-[13px] text-slate-500 mb-4 leading-snug">Gewicht = Schweregrad (S1 2 · S2 4 · S3 8 · S4 14 · S5 22) × 1 bei bestätigtem, × 0,5 bei vermutetem Vorfall × ½ je 7 Tage Alter. Index = 35 + 65 × (1 − e<sup>−Summe/30</sup>).</p>
+                            <div id="drivers" class="space-y-2"></div>
+                            <p id="drivers-sum" class="text-[12px] text-slate-400 mt-3"></p>
+                        </div>
+
                         <!-- Verlauf -->
                         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Score-Verlauf (90 Tage)</h3>
+                            <h3 class="text-sm font-bold text-slate-500 uppercase tracking-widest mb-1">Index-Verlauf (90 Tage)</h3>
+                            <p class="text-[12px] text-slate-400 mb-3">Bis 18. Oktober 2026 setzte das Sprachmodell den Wert selbst (er stand an 36 von 47 Tagen auf 75); seit 19. Oktober wird er aus den Vorfällen berechnet. Die Linie markiert den Wechsel.</p>
                             <!-- Breite und viewBox werden in renderChart an den
                                  Container angepasst, damit die Kurve unverzerrt
                                  über die ganze Breite läuft. -->
@@ -150,7 +161,7 @@
                         <div class="bg-slate-900 rounded-xl border border-slate-800 p-8 shadow-xl">
                             <div class="mb-6 pb-4 border-b border-white/10">
                                 <h3 class="font-bold text-white text-xl">Lagebericht (30 Tage)</h3>
-                                <p class="text-sm text-slate-400 mt-1">KI-Synthese aus GDELT, deutschen Nachrichten-Feeds, NINA und Such-Grounding.</p>
+                                <p class="text-sm text-slate-400 mt-1">KI-Synthese aus GDELT, deutschen Nachrichten-Feeds, NINA und eigener Websuche.</p>
                             </div>
                             <div id="assessment" class="text-slate-300 text-base leading-relaxed whitespace-pre-wrap mb-6 italic">Bitte Scan starten oder auf den täglichen Lauf warten.</div>
                             <details id="report-details" class="hidden">
@@ -174,6 +185,7 @@
                                 </div>
                             </div>
                             <div id="map"></div>
+                            <p id="map-note" class="text-[12px] text-slate-400 mt-2"></p>
                         </div>
 
                         <!-- Vorfälle -->
@@ -223,23 +235,24 @@
                     { key: "industrie", label: "Industrie", score: 44 }, { key: "cyber", label: "Cyber", score: 51 }
                 ],
                 incidents: [
-                    { date: "2026-08-28", ort: "Hamburg", lat: 53.55, lon: 9.99, sektor: "bahn", schweregrad: 4, titel: "Brandanschlag auf Kabelschacht", beschreibung: "Demo-Vorfall zur Layout-Prüfung.", quelleUrl: "https://example.org" },
-                    { date: "2026-08-25", ort: "München", lat: 48.14, lon: 11.58, sektor: "drohnen", schweregrad: 2, titel: "Drohnensichtung über Werksgelände", beschreibung: "Demo-Vorfall.", quelleUrl: "" },
-                    { date: "2026-08-20", ort: "Köln", lat: 50.94, lon: 6.96, sektor: "cyber", schweregrad: 3, titel: "DDoS auf Stadtwerke", beschreibung: "Demo-Vorfall.", quelleUrl: "https://example.org" }
+                    { date: "2026-08-28", ort: "Hamburg", lat: 53.55, lon: 9.99, sektor: "bahn", schweregrad: 4, bestaetigt: true, gewicht: 9.8, titel: "Brandanschlag auf Kabelschacht", beschreibung: "Demo-Vorfall zur Layout-Prüfung.", quelleUrl: "https://example.org" },
+                    { date: "2026-08-25", ort: "München", lat: 48.14, lon: 11.58, sektor: "drohnen", schweregrad: 2, bestaetigt: false, gewicht: 1.2, titel: "Drohnensichtung über Werksgelände", beschreibung: "Demo-Vorfall.", quelleUrl: "" },
+                    { date: "2026-08-20", ort: "Deutschland", lat: null, lon: null, sektor: "cyber", schweregrad: 3, bestaetigt: true, gewicht: 2.6, titel: "DDoS auf Stadtwerke", beschreibung: "Demo-Vorfall.", quelleUrl: "https://example.org" }
                 ],
+                index: { method: "v3", load: 13.6 },
                 sources: [
-                    { uri: "https://example.org/a", title: "Beispielquelle A", origin: "grounding" },
+                    { uri: "https://example.org/a", title: "Beispielquelle A", origin: "zitiert" },
                     { uri: "https://example.org/b", title: "Beispielquelle B", origin: "grounding" }
                 ],
                 stats: {
                     gdeltArticles: 0, newsArticles: 38, archiveArticles: 96, ninaWarnings: 7,
                     model: "demo", groundedModel: "demo",
-                    collectorErrors: ["gdelt: Rate-Limit der GDELT-API (HTTP 429) — auch nach 4 Versuchen"]
+                    collectorErrors: ["recherche/anthropic: Demo-Hinweis: Claude nicht erreichbar, Gemini übernahm"]
                 }
             },
             history: Array.from({ length: 60 }, (_, i) => {
                 const d = new Date(Date.now() - (59 - i) * 86400000);
-                return { date: d.toISOString().slice(0, 10), score: Math.round(40 + 18 * Math.abs(Math.sin(i / 9)) + (i > 45 ? 8 : 0)), incidentCount: i % 7 === 0 ? 1 : 0 };
+                return { method: i > 50 ? "v3" : undefined, date: d.toISOString().slice(0, 10), score: Math.round(40 + 18 * Math.abs(Math.sin(i / 9)) + (i > 45 ? 8 : 0)), incidentCount: i % 7 === 0 ? 1 : 0 };
             }),
             running: null
         };
@@ -303,6 +316,8 @@
                 );
                 markerLayer.addLayer(m);
             }
+            const unplaced = incidents.length - located.length;
+            el("map-note").textContent = unplaced ? unplaced + (unplaced === 1 ? " Vorfall ohne konkreten Ort ist" : " Vorfälle ohne konkreten Ort sind") + " nicht eingezeichnet, steht aber in der Liste." : "";
             if (located.length) {
                 map.fitBounds(L.latLngBounds(located.map((i) => [i.lat, i.lon])).pad(0.35), { maxZoom: 8 });
             } else {
@@ -370,6 +385,11 @@
             }
             out += '<line x1="' + padL + '" y1="' + y(45) + '" x2="' + (W - padR) + '" y2="' + y(45) + '" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.6"/>';
             out += '<line x1="' + padL + '" y1="' + y(70) + '" x2="' + (W - padR) + '" y2="' + y(70) + '" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="6 5" opacity="0.6"/>';
+            const switchAt = data.findIndex((d) => d.method === "v3");
+            if (switchAt > 0) {
+                out += '<line x1="' + x(switchAt).toFixed(1) + '" y1="' + padT + '" x2="' + x(switchAt).toFixed(1) + '" y2="' + (H - padB) + '" stroke="#64748b" stroke-width="1.5" stroke-dasharray="3 4"/>' +
+                    '<text x="' + (x(switchAt) - 6).toFixed(1) + '" y="' + (padT + 14) + '" text-anchor="end" font-size="13" fill="#64748b">neue Berechnung →</text>';
+            }
             const pts = data.map((d, i) => x(i).toFixed(1) + "," + y(d.score).toFixed(1)).join(" ");
             out += '<polyline points="' + pts + '" fill="none" stroke="#2563eb" stroke-width="3" stroke-linejoin="round"/>';
             data.forEach((d, i) => {
@@ -403,15 +423,33 @@
                 '<span class="bg-white px-1.5 py-0.5 rounded border border-slate-200">' + esc(inc.ort) + "</span>" +
                 '<span class="bg-white px-1.5 py-0.5 rounded border border-slate-200">' + esc(fmtDate(inc.date)) + "</span>" +
                 '<span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">' + esc(SECTOR_LABELS[inc.sektor] || inc.sektor) + "</span>" +
+                (inc.bestaetigt === true ? '<span class="bg-slate-800 text-white px-1.5 py-0.5 rounded">bestätigt</span>' : inc.bestaetigt === false ? '<span class="bg-white text-slate-500 px-1.5 py-0.5 rounded border border-dashed border-slate-300">Verdacht</span>' : "") +
+                (Number.isFinite(inc.gewicht) ? '<span title="Beitrag zum Index">Gewicht ' + inc.gewicht.toLocaleString("de-DE") + "</span>" : "") +
+                (!Number.isFinite(inc.lat) ? '<span title="Kein konkreter Ort – nicht auf der Karte">ohne Kartenpunkt</span>' : "") +
                 (inc.quelleUrl ? '<a class="text-blue-500 hover:underline" href="' + esc(inc.quelleUrl) + '" target="_blank" rel="noopener noreferrer">Quelle</a>' : "") +
                 "</div></div>"
             ).join("");
         }
 
+        function renderDrivers(latest) {
+            const card = el("drivers-card");
+            const incs = (latest.incidents || []).filter((i) => Number.isFinite(i.gewicht) && i.gewicht > 0);
+            if (!latest.index || !incs.length) { card.classList.add("hidden"); return; }
+            card.classList.remove("hidden");
+            const total = incs.reduce((a, i) => a + i.gewicht, 0);
+            el("drivers").innerHTML = incs.slice(0, 8).map((i) =>
+                '<div class="flex items-center gap-3">' +
+                '<span class="w-40 md:w-64 truncate text-[13px] text-slate-700" title="' + esc(i.titel) + '">' + esc(i.titel) + "</span>" +
+                '<div class="flex-grow bg-slate-100 h-2.5 rounded-full overflow-hidden"><div class="h-2.5 rounded-full" style="width:' + Math.max(3, (i.gewicht / total) * 100).toFixed(0) + "%;background:" + sevColor(i.schweregrad) + '"></div></div>' +
+                '<span class="w-12 text-right text-[12px] font-bold text-slate-500">' + i.gewicht.toLocaleString("de-DE") + "</span></div>"
+            ).join("");
+            el("drivers-sum").textContent = "Summe der Gewichte: " + Number(latest.index.load).toLocaleString("de-DE") + " → Index " + latest.score + (incs.length > 8 ? " · " + (incs.length - 8) + " weitere Vorfälle mit kleinerem Gewicht" : "");
+        }
+
         function renderSources(sources) {
             const box = el("sources");
             if (!sources || !sources.length) {
-                box.innerHTML = '<div class="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Keine Grounding-Quellen im letzten Scan.</div>';
+                box.innerHTML = '<div class="text-sm text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">Keine Recherche-Quellen im letzten Scan.</div>';
                 return;
             }
             box.innerHTML = sources.map((s) => {
@@ -419,7 +457,7 @@
                 try { host = new URL(s.uri).hostname.replace("www.", ""); } catch { host = ""; }
                 return '<a href="' + esc(s.uri) + '" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-slate-100 hover:border-blue-400 bg-slate-50 group">' +
                     '<span class="text-[13px] font-medium text-slate-700 group-hover:text-blue-600 truncate">' + esc(s.title) + "</span>" +
-                    '<span class="text-[11px] text-slate-400 shrink-0">' + esc(host) + "</span></a>";
+                    '<span class="text-[11px] text-slate-400 shrink-0">' + esc(host) + (s.origin === "zitiert" ? " · zitiert" : "") + "</span></a>";
             }).join("");
         }
 
@@ -435,7 +473,11 @@
             [/^feeds:\s*/i, "Nachrichten-Feeds"],
             [/^nina\/([\w-]+):\s*/i, "NINA-Kanal"],
             [/^nina:\s*/i, "NINA-Warnmeldungen"],
-            [/^grounding:\s*/i, "KI-Recherche (Such-Grounding)"]
+            [/^grounding:\s*/i, "KI-Recherche (Such-Grounding)"],
+            [/^recherche\/anthropic:\s*/i, "KI-Recherche (Claude) – ersatzweise Gemini"],
+            [/^recherche\/gemini:\s*/i, "KI-Recherche (Gemini)"],
+            [/^auswertung\/anthropic:\s*/i, "KI-Auswertung (Claude) – ersatzweise Gemini"],
+            [/^auswertung\/gemini:\s*/i, "KI-Auswertung (Gemini)"]
         ];
 
         function describeHint(note) {
@@ -496,7 +538,7 @@
             if (!latest) { renderHints([]); ensureMap(); return; }
 
             el("last-update").textContent = "Stand: " + fmtDateTime(latest.generatedAt);
-            el("status-engine").textContent = latest.stats?.model ? "Engine: " + latest.stats.model : "";
+            el("status-engine").textContent = latest.stats?.model ? "Auswertung: " + latest.stats.model + (latest.stats.groundedModel && latest.stats.groundedModel !== latest.stats.model ? " · Recherche: " + latest.stats.groundedModel : "") : "";
             el("stat-gdelt").textContent = latest.stats?.gdeltArticles ?? "–";
             el("stat-news").textContent = latest.stats?.newsArticles ?? "–";
             el("stat-archive").textContent = latest.stats?.archiveArticles ?? "–";
@@ -512,6 +554,7 @@
             renderMap(latest.incidents || []);
             renderIncidents(latest.incidents || []);
             renderSources(latest.sources || []);
+            renderDrivers(latest);
             renderHints(latest.stats?.collectorErrors || []);
 
             el("assessment").classList.remove("italic");

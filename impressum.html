@@ -74,11 +74,12 @@
     GDELT-DOC-API und die öffentlichen RSS-Feeds der großen deutschen Nachrichtenhäuser
     (u.&nbsp;a. tagesschau, ZDFheute, Deutschlandfunk, Spiegel, Zeit, FAZ, Süddeutsche, Welt,
     ntv, heise) sowie amtliche Warnmeldungen der NINA-Schnittstelle des BBK (warnung.bund.de),
-    lässt Google Gemini mit Such-Grounding recherchieren und konsolidiert alles zu Score,
-    Sektorwerten und Vorfallsliste. Aus den Feeds werden ausschließlich Schlagzeile, Link und
+    lässt ein Sprachmodell mit Websuche recherchieren – Claude von Anthropic über das Netlify AI
+    Gateway, ersatzweise Google Gemini – und fasst alles zu einer Vorfallsliste zusammen; den Index
+    und die Sektorwerte berechnet der Server daraus nach einer festen Regel. Aus den Feeds werden ausschließlich Schlagzeile, Link und
     Datum übernommen, und nur, wenn sie Infrastruktur-Sicherheit betreffen. Ortsnamen aus den
     Vorfällen werden über Nominatim (OpenStreetMap) in Koordinaten aufgelöst.
-    <strong>An keiner dieser Stellen fließen Besucherdaten:</strong> Google, GDELT, die
+    <strong>An keiner dieser Stellen fließen Besucherdaten:</strong> Anthropic, Netlify, Google, GDELT, die
     Nachrichtenhäuser, das BBK und Nominatim sehen nur die Anfragen des Servers, nie Ihren
     Browser.</p>
     <p>Gespeichert werden ausschließlich die Ergebnisse: das aktuelle Lagebild, die

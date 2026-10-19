@@ -1,67 +1,58 @@
 /* Offline unit tests for the validation layer: node tests/core.test.mjs */
 
 import assert from "node:assert/strict";
-import { normalizeAnalysis, updateHistory, riskLevel } from "../lib/core.mjs";
+import { normalizeAnalysis, updateHistory, riskLevel, computeIndex, incidentWeight } from "../lib/core.mjs";
 
 const today = new Date().toISOString().slice(0, 10);
 const recent = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10);
 const ancient = "2020-01-01";
 
-// --- normalizeAnalysis: happy path ---
+// --- normalizeAnalysis: the index is computed from the incidents, never taken from the model ---
 {
   const out = normalizeAnalysis({
-    score: 62,
+    score: 99,
     assessment: "Mehrere Vorfälle an Bahnanlagen in den letzten Wochen deuten auf eine erhöhte Bedrohungslage hin.",
-    sectors: [
-      { key: "bahn", score: 70 },
-      { key: "unbekannt", score: 99 },
-      { key: "cyber", score: 150 },
-    ],
+    sectors: [{ key: "cyber", score: 150 }],
     incidents: [
-      {
-        date: recent,
-        ort: "Hamburg",
-        lat: 53.55,
-        lon: 9.99,
-        sektor: "bahn",
-        schweregrad: 4,
-        titel: "Brandanschlag auf Kabelschacht",
-        beschreibung: "x".repeat(1000),
-        quelleUrl: "https://example.org/artikel",
-      },
+      { date: recent, ort: "Hamburg", lat: 53.55, lon: 9.99, sektor: "bahn", schweregrad: 4, bestaetigt: true,
+        titel: "Brandanschlag auf Kabelschacht", beschreibung: "x".repeat(1000), quelleUrl: "https://example.org/artikel" },
       { date: ancient, ort: "Alt", sektor: "bahn", schweregrad: 3, titel: "Zu alt" },
       { date: recent, ort: "", sektor: "bahn", schweregrad: 3, titel: "Ohne Ort" },
-      { date: recent, ort: "Paris", lat: 48.85, lon: 2.35, sektor: "sonstige", schweregrad: 2, titel: "Koordinaten außerhalb" },
+      { date: recent, ort: "Paris", lat: 48.85, lon: 2.35, sektor: "sonstige", schweregrad: 2, bestaetigt: false, titel: "Koordinaten außerhalb" },
+      { date: recent, ort: "Deutschland", lat: 51.16, lon: 10.45, sektor: "cyber", schweregrad: 3, bestaetigt: true, titel: "Bundesweit" },
     ],
   });
-  assert.equal(out.score, 62);
-  assert.equal(out.level, "ERHÖHT");
-  assert.equal(out.incidents.length, 2, "old and place-less incidents are dropped");
+  assert.equal(out.incidents.length, 3, "old and place-less incidents are dropped");
   assert.equal(out.incidents[0].beschreibung.length, 600, "description is capped");
-  assert.equal(out.incidents[1].lat, null, "non-German coordinates are cleared");
+  const paris = out.incidents.find((i) => i.ort === "Paris");
+  assert.equal(paris.lat, null, "non-German coordinates are cleared");
+  const de = out.incidents.find((i) => i.ort === "Deutschland");
+  assert.equal(de.lat, null, "a generic place gets no map point");
+  assert.equal(de.generic, true);
+  assert.notEqual(out.score, 99, "the model's score is ignored");
+  const expected = computeIndex(out.incidents).score;
+  assert.equal(out.score, expected);
+  assert.equal(out.level, riskLevel(expected));
   assert.equal(out.sectors.length, 6, "always the six known sectors");
-  const cyber = out.sectors.find((s) => s.key === "cyber");
-  assert.equal(cyber.score, 100, "sector scores are clamped");
-  const energie = out.sectors.find((s) => s.key === "energie");
-  assert.equal(energie.score, 35, "missing sectors fall to baseline");
+  assert.ok(out.sectors.find((s) => s.key === "bahn").score > 35, "a sector with an incident rises above the baseline");
+  assert.equal(out.sectors.find((s) => s.key === "energie").score, 35, "a sector without incidents stays at the baseline");
+  assert.equal(out.index.method, "v3");
+  assert.ok(out.incidents[0].gewicht >= out.incidents[1].gewicht, "incidents are sorted by weight");
 }
 
-// --- normalizeAnalysis: baseline enforcement with no incidents ---
+// --- computeIndex: baseline, suspicion counts half, age decays ---
 {
-  const out = normalizeAnalysis({
-    score: 95,
-    assessment: "Keine Vorfälle in den letzten 30 Tagen; die Lage bleibt auf dem bekannten Grundniveau angespannt.",
-    sectors: [],
-    incidents: [],
-  });
-  assert.equal(out.score, 45, "no incidents caps the score at the baseline band");
-  const low = normalizeAnalysis({
-    score: 5,
-    assessment: "Keine Vorfälle in den letzten 30 Tagen; die Lage bleibt auf dem bekannten Grundniveau angespannt.",
-    sectors: [],
-    incidents: [],
-  });
-  assert.equal(low.score, 35, "no incidents lifts the score to the baseline band");
+  assert.equal(computeIndex([]).score, 35, "no incidents: the baseline");
+  const now = Date.parse("2026-10-19T12:00:00Z");
+  const conf = { date: "2026-10-19", schweregrad: 5, bestaetigt: true, sektor: "energie" };
+  const susp = { ...conf, bestaetigt: false };
+  const old = { ...conf, date: "2026-10-05" };
+  assert.ok(incidentWeight(susp, now) < incidentWeight(conf, now) * 0.6, "a suspicion counts half");
+  assert.ok(incidentWeight(old, now) < incidentWeight(conf, now) * 0.3, "two weeks old: a quarter");
+  const one = computeIndex([conf], now).score, two = computeIndex([conf, { ...conf, sektor: "bahn" }], now).score;
+  assert.ok(one > 60 && one < 72, "one fresh severity-5 attack: high, not yet critical");
+  assert.ok(two > 75, "two of them: critical");
+  assert.ok(computeIndex(Array.from({ length: 40 }, () => conf), now).score <= 100);
 }
 
 // --- normalizeAnalysis: rejects thin output ---
