@@ -88,3 +88,12 @@ assert.deepEqual(parseFeed("<rss><channel></channel></rss>"), []);
 }
 
 console.log("sources tests passed");
+
+/* GDELT query: the language filter by name, at most nine alternatives (regression 2026-10-19). */
+{
+  const { GDELT_QUERY } = await import("../lib/sources.mjs");
+  if (!/sourcelang:german\b/.test(GDELT_QUERY)) throw new Error("GDELT_QUERY must use sourcelang:german");
+  const alternatives = GDELT_QUERY.split(/\s+OR\s+/).length;
+  if (alternatives > 9) throw new Error(`GDELT_QUERY has ${alternatives} alternatives; GDELT refuses more than about nine`);
+  console.log("gdelt query checks passed");
+}
