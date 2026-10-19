@@ -86,7 +86,7 @@ export default async (req) => {
     );
 
     const reportText = researched?.text || "";
-    const groundedSources = researched?.sources || [];
+    const groundedSources = [...(researched?.sources || [])];
     const groundedModel = researched?.model || "";
     if (researched) console.log(`scan-run: research via ${researched.provider}/${groundedModel}, ${groundedSources.length} sources`);
 
@@ -106,6 +106,18 @@ export default async (req) => {
     console.log(
       `scan-run: analysis via ${consolidated.provider}/${model}: index ${analysis.score} (load ${analysis.index.load}), ${analysis.incidents.length} incidents`
     );
+
+    /* The source links of the incidents belong in the source list too. */
+    const listedUris = new Set(groundedSources.map((x) => x.uri));
+    for (const inc of analysis.incidents) {
+      if (inc.quelleUrl && !listedUris.has(inc.quelleUrl)) {
+        listedUris.add(inc.quelleUrl);
+        groundedSources.push({ uri: inc.quelleUrl, title: inc.titel, origin: "Vorfall" });
+      }
+    }
+    if (groundedSources.some((x) => x.origin !== "gefunden")) {
+      for (let k = groundedSources.length - 1; k >= 0; k -= 1) if (groundedSources[k].origin === "gefunden") groundedSources.splice(k, 1);
+    }
 
     const geocache = (await store.get("geocache", { type: "json" })) || {};
     await geocodeIncidents(analysis.incidents, geocache);

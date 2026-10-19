@@ -457,7 +457,7 @@
                 try { host = new URL(s.uri).hostname.replace("www.", ""); } catch { host = ""; }
                 return '<a href="' + esc(s.uri) + '" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-slate-100 hover:border-blue-400 bg-slate-50 group">' +
                     '<span class="text-[13px] font-medium text-slate-700 group-hover:text-blue-600 truncate">' + esc(s.title) + "</span>" +
-                    '<span class="text-[11px] text-slate-400 shrink-0">' + esc(host) + (s.origin === "zitiert" ? " · zitiert" : "") + "</span></a>";
+                    '<span class="text-[11px] text-slate-400 shrink-0">' + esc(host) + (s.origin === "zitiert" ? " · zitiert" : s.origin === "Vorfall" ? " · Beleg eines Vorfalls" : "") + "</span></a>";
             }).join("");
         }
 
